@@ -1,6 +1,6 @@
 {
-  "id": "c83cbcdb-a8d2-4ed2-bd56-1d4a9502cd56",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "ac8a4c9b-fe8e-4fff-8af4-82656d1a8a7c",
+  "prevId": "c83cbcdb-a8d2-4ed2-bd56-1d4a9502cd56",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -27,11 +27,17 @@
           "primaryKey": false,
           "notNull": true
         },
+        "salt": {
+          "name": "salt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "password": {
           "name": "password",
-          "type": "varchar(255)",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "role": {
           "name": "role",

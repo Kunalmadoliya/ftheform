@@ -9,3 +9,14 @@ export const getAuthenticationMethodOutputSchema = z.object({
 export type GetAuthenticationMethodOutputSchema = z.infer<
   typeof getAuthenticationMethodOutputSchema
 >;
+
+export const createUserWithEmailAndPasswordInput = z.object({
+  fullName: z.string().describe("User's full name"),
+
+  email: z.email().describe("User's email"),
+  password: z.string().min(6).describe("User's password"),
+});
+
+export type createUserWithEmailAndPasswordInputType = z.infer<
+  typeof createUserWithEmailAndPasswordInput
+>;
