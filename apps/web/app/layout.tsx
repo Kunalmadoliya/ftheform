@@ -13,8 +13,41 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Streamyst",
-  description: "Media Forwarding",
+  title: {
+    default: "FTHEFORM",
+    template: "%s | FTHEFORM",
+  },
+  description:
+    "Create, share, and manage forms with a modern seamless experience.",
+  keywords: [
+    "forms",
+    "form builder",
+    "survey tool",
+    "online forms",
+    "data collection",
+    "FTHEFORM",
+  ],
+  authors: [{ name: "Kunal Madoliya" }],
+  creator: "Kunal Madoliya",
+  metadataBase: new URL("https://ftform.kunalmadoliya.me"),
+
+  openGraph: {
+    title: "FTHEFORM",
+    description:
+      "Create, share, and manage forms with a modern seamless experience.",
+    url: "https://ftform.kunalmadoliya.me",
+    siteName: "FTHEFORM",
+    type: "website",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "FTHEFORM",
+    description:
+      "Create, share, and manage forms with a modern seamless experience.",
+  },
+
+  applicationName: "FTHEFORM",
 };
 
 export default function RootLayout({
