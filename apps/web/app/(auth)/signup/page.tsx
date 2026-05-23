@@ -8,6 +8,8 @@ import { PixelButton } from "../../../components/PixelButton";
 import { AuthShell, Field, GoogleG } from "../signin/page";
 import { sfx } from "../../../lib/sound";
 
+import { useSignup } from "~/hooks/api/auth";
+
 type FormData = {
   name: string;
   email: string;
@@ -18,6 +20,8 @@ function SignupPage() {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
 
+  const { createUserWithEmailAndPasswordAsync } = useSignup();
+
   const { handleSubmit, control } = useForm<FormData>({
     defaultValues: {
       name: "",
@@ -26,32 +30,37 @@ function SignupPage() {
     },
   });
 
-  const submit = (data: FormData) => {
+  const submit = async (data: FormData) => {
     try {
-      console.log("Form Data:", data); // logs all values
       sfx.level();
-     
+
+      const { id } = await createUserWithEmailAndPasswordAsync({
+        fullName: data.name,
+        email: data.email,
+        password: data.password,
+      });
+      console.log(id);
     } catch (e) {
       sfx.error();
       setErr((e as Error).message);
     }
   };
 
-  // const googleSso = () => {
-  //   try {
-  //     sfx.level();
-  //     router.push("/dashboard");
-  //   } catch (e) {
-  //     sfx.error();
-  //     setErr((e as Error).message);
-  //   }
-  // };
+  const googleSso = () => {
+    try {
+      sfx.level();
+      router.push("/dashboard");
+    } catch (e) {
+      sfx.error();
+      setErr((e as Error).message);
+    }
+  };
 
   return (
     <AuthShell title="New Hero" subtitle="Start building forms in 10 seconds.">
       <button
         type="button"
-        // onClick={googleSso}
+        onClick={googleSso}
         className="w-full mb-5 flex items-center justify-center gap-3 px-4 py-2.5 border-2 border-quest-ink/20 bg-card rounded font-semibold text-sm hover:border-primary transition-colors shadow-pixel btn-press"
       >
         <GoogleG />
@@ -71,11 +80,7 @@ function SignupPage() {
           name="name"
           control={control}
           render={({ field }) => (
-            <Field
-              label="Hero name"
-              value={field.value}
-              onChange={field.onChange}
-            />
+            <Field label="Hero name" value={field.value} onChange={field.onChange} />
           )}
         />
 
@@ -83,12 +88,7 @@ function SignupPage() {
           name="email"
           control={control}
           render={({ field }) => (
-            <Field
-              label="Email"
-              type="email"
-              value={field.value}
-              onChange={field.onChange}
-            />
+            <Field label="Email" type="email" value={field.value} onChange={field.onChange} />
           )}
         />
 
@@ -96,12 +96,7 @@ function SignupPage() {
           name="password"
           control={control}
           render={({ field }) => (
-            <Field
-              label="Password"
-              type="password"
-              value={field.value}
-              onChange={field.onChange}
-            />
+            <Field label="Password" type="password" value={field.value} onChange={field.onChange} />
           )}
         />
 
@@ -118,7 +113,11 @@ function SignupPage() {
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Already a player?{" "}
-        <Link href="/signin" className="text-primary font-semibold hover:underline">
+        <Link
+          href="/signin"
+          onClick={() => sfx.coin()}
+          className="text-primary font-semibold hover:underline"
+        >
           Log in
         </Link>
       </p>

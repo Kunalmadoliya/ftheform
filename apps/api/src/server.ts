@@ -23,9 +23,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 // CORS for development only
 if (env.NODE_ENV !== "prod") {
   app.use(
-    cors({
-      origin: "*",
-    }),
+    cors(),
   );
 }
 

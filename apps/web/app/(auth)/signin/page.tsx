@@ -108,6 +108,7 @@ function LoginPage() {
         New here?{" "}
         <Link
           href="/signup"
+          onClick={()=> sfx.click()}
           className="text-primary font-semibold hover:underline"
         >
           Create an account

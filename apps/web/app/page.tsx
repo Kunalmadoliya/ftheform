@@ -85,7 +85,7 @@ export default function Landing() {
                 <Link href="/signup" onClick={() => sfx.coin()}>
                   <PixelButton size="lg">▶ Start Building Free</PixelButton>
                 </Link>
-                <Link href="/login" onClick={() => sfx.click()}>
+                <Link href="/signin" onClick={() => sfx.click()}>
                   <PixelButton size="lg" variant="ghost">
                     Log In
                   </PixelButton>
