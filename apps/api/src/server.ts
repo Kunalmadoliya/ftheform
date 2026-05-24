@@ -21,7 +21,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    origin: ["http://localhost:3000", "https://ftheform.kunalmadoliya.me"],
     credentials: true,
   }),
 );
