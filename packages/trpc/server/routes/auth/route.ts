@@ -1,5 +1,5 @@
 import { userService } from "../../services";
-import { publicProcedure, router } from "../../trpc";
+import { authenticatedProcedure, publicProcedure, router } from "../../trpc";
 import { getAuthenticationCookie, setAuthenticationCookie } from "../../utils/cookie";
 import { generatePath } from "../../utils/path-generator";
 import {
@@ -9,6 +9,7 @@ import {
   signInUserWithEmailAndPasswordOutputModel,
   getLoggedInUserInfoInput,
   getLoggedInUserInfoOutputModel,
+  logoutUserOutputModel,
 } from "./model";
 import { ApiError } from "@repo/api-responses/api-error";
 
@@ -59,33 +60,52 @@ export const authRouter = router({
       };
     }),
 
-  getLoggedInUserInfo: publicProcedure
+  getLoggedInUserInfo: authenticatedProcedure
     .meta({
       openapi: {
         method: "GET",
         path: getPath("/getLoggedInUserInfo"),
         tags: TAGS,
+        protect : true
       },
     })
     .input(getLoggedInUserInfoInput)
     .output(getLoggedInUserInfoOutputModel)
     .query(async ({ ctx }) => {
-      const userToken = getAuthenticationCookie(ctx);
+      const user = await userService.getUserInfoByID(ctx.user.id)
 
-      if (!userToken) {
-        throw ApiError.unauthorized("Unauthorized");
-      }
-
-      const user = await userService.verifyDecodedUser(userToken);
-
-      if (!user.id || !user.email || !user.fullName) {
-        throw ApiError.unauthorized("Invalid user data");
+      if (!user) {
+        throw ApiError.unauthorized("Unauthorized")
       }
 
       return {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
+      };
+    }),
+
+  logoutUser: publicProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/logoutUser"),
+        tags: TAGS,
+      },
+    })
+    .output(logoutUserOutputModel)
+    .mutation(async ({ ctx }) => {
+      const userToken = getAuthenticationCookie(ctx);
+
+      if (!userToken) {
+        throw ApiError.unauthorized("Unauthorized");
+      }
+
+      ctx.clearCookie("authentication-token");
+
+      return {
+        success: true,
+        message: "User logged out successfully",
       };
     }),
 });

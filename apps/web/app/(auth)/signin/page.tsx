@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { PixelButton } from "../../../components/PixelButton";
-import { PixelLogo } from "../../../components/PixelLogo";
-import { sfx } from "../../../lib/sound";
+import { PixelButton } from "~/components/PixelButton";
+import { PixelLogo } from "~/components/PixelLogo";
+import { sfx } from "~/lib/sound";
 import { useSignin } from "~/hooks/api/auth";
 import { useState } from "react";
 import { useForm } from "react-hook-form";

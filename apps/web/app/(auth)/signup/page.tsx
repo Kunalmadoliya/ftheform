@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { PixelButton } from "../../../components/PixelButton";
+import { PixelButton } from "~/components/PixelButton";
 import { AuthShell, Field, GoogleG } from "../signin/page";
-import { sfx } from "../../../lib/sound";
+import { sfx } from "~/lib/sound";
 
 import { useSignup } from "~/hooks/api/auth";
 

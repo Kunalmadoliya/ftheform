@@ -62,7 +62,7 @@ class UserService {
     }
   }
 
-  private async getUserInfoByID(id: string) {
+  public async getUserInfoByID(id: string) {
     const user = await db
       .select({
         id: usersTable.id,
@@ -139,12 +139,19 @@ class UserService {
 
   public async verifyDecodedUser(token: string) {
     const { id } = await this.verifyUserToken(token);
-    const userInfo = await this.getUserInfoByID(id);
-
-    return { ...userInfo };
+    return { id};
   }
 
-  public async logoutUser(token: string) {}
+  public async logoutUser() {
+    try {
+      return {
+        success: true,
+        message: "Logged out successfully",
+      };
+    } catch (error) {
+      throw ApiError.badRequest("Something went wrong, Please try after some time");
+    }
+  }
 }
 
 export default UserService;
