@@ -1,22 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { PixelButton } from "../../../components/PixelButton";
 import { PixelLogo } from "../../../components/PixelLogo";
 import { sfx } from "../../../lib/sound";
+import { useSignin } from "~/hooks/api/auth";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+
+type LoginFormData = {
+  email: string;
+  password: string;
+};
 
 function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const { signInUserWithEmailAndPasswordAsync } = useSignin();
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const submit = async (data: LoginFormData) => {
     try {
       sfx.level();
 
-      // Add your login logic here
+      const { id } = await signInUserWithEmailAndPasswordAsync({
+        email: data.email,
+        password: data.password,
+      });
+
+      router.replace("/dashboard");
 
       setErr(null);
     } catch (e) {
@@ -26,8 +51,8 @@ function LoginPage() {
   };
 
   const useDemo = () => {
-    setEmail("kunal");
-    setPassword(",mad");
+    setValue("email", "kunal");
+    setValue("password", ",mad");
     sfx.coin();
     setErr(null);
   };
@@ -35,8 +60,6 @@ function LoginPage() {
   const googleSso = () => {
     try {
       sfx.level();
-
-      // Add Google SSO logic here
 
       setErr(null);
     } catch (e) {
@@ -46,10 +69,7 @@ function LoginPage() {
   };
 
   return (
-    <AuthShell
-      title="Continue Quest"
-      subtitle="Log in to keep building forms."
-    >
+    <AuthShell title="Continue Quest" subtitle="Log in to keep building forms.">
       <div className="space-y-3 mb-5">
         <button
           type="button"
@@ -78,19 +98,17 @@ function LoginPage() {
         <div className="h-px flex-1 bg-quest-ink/10" />
       </div>
 
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={handleSubmit(submit)} className="space-y-4">
         <Field
           label="Email"
           type="email"
-          value={email}
-          onChange={setEmail}
+          register={register("email", { required: "Email is required" })}
         />
 
         <Field
           label="Password"
           type="password"
-          value={password}
-          onChange={setPassword}
+          register={register("password", { required: "Password is required" })}
         />
 
         {err && (
@@ -108,7 +126,7 @@ function LoginPage() {
         New here?{" "}
         <Link
           href="/signup"
-          onClick={()=> sfx.click()}
+          onClick={() => sfx.click()}
           className="text-primary font-semibold hover:underline"
         >
           Create an account
@@ -179,13 +197,11 @@ export function AuthShell({
 export function Field({
   label,
   type = "text",
-  value,
-  onChange,
+  register,
 }: {
   label: string;
   type?: string;
-  value: string;
-  onChange: (v: string) => void;
+  register: any;
 }) {
   return (
     <label className="block">
@@ -195,9 +211,7 @@ export function Field({
 
       <input
         type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
+        {...register}
         className="w-full px-3 py-2.5 rounded border-2 border-quest-ink/15 bg-background text-sm focus:border-primary focus:outline-none"
       />
     </label>

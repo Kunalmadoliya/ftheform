@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { PixelButton } from "../../../components/PixelButton";
 import { AuthShell, Field, GoogleG } from "../signin/page";
 import { sfx } from "../../../lib/sound";
@@ -22,7 +22,11 @@ function SignupPage() {
 
   const { createUserWithEmailAndPasswordAsync } = useSignup();
 
-  const { handleSubmit, control } = useForm<FormData>({
+  const {
+    handleSubmit,
+    register,
+    formState: { errors },
+  } = useForm<FormData>({
     defaultValues: {
       name: "",
       email: "",
@@ -39,7 +43,8 @@ function SignupPage() {
         email: data.email,
         password: data.password,
       });
-      console.log(id);
+
+      router.push("/dashboard");
     } catch (e) {
       sfx.error();
       setErr((e as Error).message);
@@ -76,28 +81,18 @@ function SignupPage() {
       </div>
 
       <form onSubmit={handleSubmit(submit)} className="space-y-4">
-        <Controller
-          name="name"
-          control={control}
-          render={({ field }) => (
-            <Field label="Hero name" value={field.value} onChange={field.onChange} />
-          )}
+        <Field label="Hero name" register={register("name", { required: "Name is required" })} />
+
+        <Field
+          label="Email"
+          type="email"
+          register={register("email", { required: "Email is required" })}
         />
 
-        <Controller
-          name="email"
-          control={control}
-          render={({ field }) => (
-            <Field label="Email" type="email" value={field.value} onChange={field.onChange} />
-          )}
-        />
-
-        <Controller
-          name="password"
-          control={control}
-          render={({ field }) => (
-            <Field label="Password" type="password" value={field.value} onChange={field.onChange} />
-          )}
+        <Field
+          label="Password"
+          type="password"
+          register={register("password", { required: "Password is required" })}
         />
 
         {err && (

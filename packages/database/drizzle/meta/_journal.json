@@ -15,6 +15,13 @@
       "when": 1779518173293,
       "tag": "0001_purple_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779607280560,
+      "tag": "0002_fresh_synch",
+      "breakpoints": true
     }
   ]
 }

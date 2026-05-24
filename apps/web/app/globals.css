@@ -1,74 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Manrope:wght@400;500;600;700;800&display=swap');
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  /* Radius */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-
-  /* Shadcn tokens */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
-  /* Sidebar */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
-  /* Retro theme */
-  --color-quest-cream: var(--quest-cream);
-  --color-quest-ink: var(--quest-ink);
-  --color-quest-amber: var(--quest-amber);
-  --color-quest-leaf: var(--quest-leaf);
-  --color-quest-sky: var(--quest-sky);
-  --color-quest-magenta: var(--quest-magenta);
-  --color-quest-tan: var(--quest-tan);
-
-  /* Fonts */
-  --font-pixel: "VT323", monospace;
-  --font-arcade: "Press Start 2P", cursive;
-  --font-sans: "Manrope", system-ui, sans-serif;
-
-  /* Shadows */
-  --shadow-pixel: 4px 4px 0 0 var(--quest-ink);
-  --shadow-pixel-lg: 6px 6px 0 0 var(--quest-ink);
-  --shadow-glow: 0 0 24px color-mix(in oklab, var(--primary) 45%, transparent);
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --radius: 0.5rem;
@@ -140,6 +73,7 @@
   --destructive-foreground: oklch(0.95 0.02 80);
   --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.14);
+  --ring: var(--quest-amber);
 
   --sidebar: oklch(0.2 0.03 50);
   --sidebar-foreground: oklch(0.95 0.02 80);
@@ -153,49 +87,42 @@
 
 @layer base {
   * {
-    border-color: var(--color-border);
+    border-color: var(--border);
   }
 
   body {
     margin: 0;
     padding: 0;
-    background-color: var(--quest-cream);
-    color: var(--quest-ink);
-    font-family: var(--font-sans);
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Manrope', system-ui, sans-serif;
   }
 
-  h1,
-  h2,
-  h3,
-  p,
-  label,
-  .font-pixel {
-    font-family: var(--font-pixel);
+  h1, h2, h3, p, label {
+    font-family: 'VT323', monospace;
     letter-spacing: 0.01em;
-     font-size: 1.1em;
-  
   }
 }
 
 @layer utilities {
-  .font-arcade {
-    font-family: var(--font-arcade);
+  .font-pixel {
+    font-family: 'VT323', monospace;
   }
 
-  .font-pixel {
-    font-family: var(--font-pixel);
+  .font-arcade {
+    font-family: 'Press Start 2P', cursive;
   }
 
   .shadow-pixel {
-    box-shadow: var(--shadow-pixel);
+    box-shadow: 4px 4px 0 0 var(--quest-ink);
   }
 
   .shadow-pixel-lg {
-    box-shadow: var(--shadow-pixel-lg);
+    box-shadow: 6px 6px 0 0 var(--quest-ink);
   }
 
   .shadow-glow {
-    box-shadow: var(--shadow-glow);
+    box-shadow: 0 0 24px color-mix(in oklab, var(--primary) 45%, transparent);
   }
 
   .btn-press {
@@ -242,8 +169,12 @@
   }
 
   @keyframes float-y {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
   }
 
   .animate-float {
@@ -251,8 +182,12 @@
   }
 
   @keyframes blink {
-    0%, 50%, 100% { opacity: 1; }
-    25%, 75% { opacity: 0.3; }
+    0%, 50%, 100% {
+      opacity: 1;
+    }
+    25%, 75% {
+      opacity: 0.3;
+    }
   }
 
   .animate-blink {
@@ -260,8 +195,14 @@
   }
 
   @keyframes pixel-pop {
-    0% { transform: scale(0.92); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+      transform: scale(0.92);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   .animate-pop {
