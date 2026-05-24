@@ -4,6 +4,7 @@ const envSchema = z.object({
   PORT: z.string().optional(),
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   BASE_URL: z.string().default("http://localhost:8000"),
+  JWT_SECRET: z.string()
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {
