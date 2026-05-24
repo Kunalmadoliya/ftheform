@@ -150,7 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           ☰
         </button>
-        <div className="font-pixel text-sm uppercase tracking-widest truncate">{current.label}</div>
+        <div className="font-pixel text-sm uppercase tracking-widest truncate">kunal</div>
         <div className="font-pixel text-[10px] uppercase tracking-widest text-muted-foreground">
           Lvl {stats.level}
         </div>
