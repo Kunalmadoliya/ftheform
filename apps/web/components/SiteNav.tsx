@@ -8,12 +8,7 @@ import { PixelLogo } from "./PixelLogo";
 import { SoundToggle } from "./SoundToggle";
 import { useUser } from "~/hooks/api/auth";
 import { sfx } from "../lib/sound";
-
-const navLinks = [
-  { href: "/", label: "Explore" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/api-docs", label: "API" },
-] as const;
+import { env } from "~/env";
 
 export function SiteNav() {
   const pathname = usePathname();
@@ -24,6 +19,14 @@ export function SiteNav() {
     setOpen(false);
   }, [pathname]);
 
+  const apiDocsUrl = `${(env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/trpc").replace(/\/trpc$/, "")}/docs`;
+
+  const navLinks = [
+    { href: "/", label: "Explore", external: false },
+    { href: "/pricing", label: "Pricing", external: false },
+    { href: apiDocsUrl, label: "API", external: true },
+  ];
+
   return (
     <nav className="sticky top-0 z-40 backdrop-blur-md bg-background/80 border-b-2 border-quest-ink/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
@@ -33,7 +36,11 @@ export function SiteNav() {
         </Link>
         <div className="hidden md:flex items-center gap-7 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           {navLinks.map((l) => (
-            <Link key={l.href} href={l.href} className="hover:text-primary transition-colors">{l.label}</Link>
+            l.external ? (
+              <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">{l.label}</a>
+            ) : (
+              <Link key={l.href} href={l.href} className="hover:text-primary transition-colors">{l.label}</Link>
+            )
           ))}
           <a href="/#features" className="hover:text-primary transition-colors">Features</a>
         </div>
@@ -61,9 +68,15 @@ export function SiteNav() {
         <div className="md:hidden border-t-2 border-quest-ink/10 bg-background/95 backdrop-blur-md animate-slide-up">
           <div className="px-4 py-4 flex flex-col gap-1 text-sm font-semibold uppercase tracking-widest">
             {navLinks.map((l) => (
-              <Link key={l.href} href={l.href} className="px-3 py-3 rounded hover:bg-secondary text-muted-foreground hover:text-primary">
-                {l.label}
-              </Link>
+              l.external ? (
+                <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="px-3 py-3 rounded hover:bg-secondary text-muted-foreground hover:text-primary">
+                  {l.label}
+                </a>
+              ) : (
+                <Link key={l.href} href={l.href} className="px-3 py-3 rounded hover:bg-secondary text-muted-foreground hover:text-primary">
+                  {l.label}
+                </Link>
+              )
             ))}
             <a href="/#features" className="px-3 py-3 rounded hover:bg-secondary text-muted-foreground hover:text-primary">Features</a>
             <div className="h-px bg-quest-ink/10 my-2" />
@@ -73,7 +86,7 @@ export function SiteNav() {
               </Link>
             ) : (
               <div className="flex gap-2">
-                <Link href="/login" className="flex-1" onClick={() => sfx.click()}>
+                <Link href="/signin" className="flex-1" onClick={() => sfx.click()}>
                   <PixelButton size="sm" variant="ghost" className="w-full">Log In</PixelButton>
                 </Link>
                 <Link href="/signup" className="flex-1" onClick={() => sfx.click()}>

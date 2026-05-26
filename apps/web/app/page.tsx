@@ -139,7 +139,7 @@ export default function Landing() {
             <Link href="/pricing" onClick={() => sfx.coin()}>
               <PixelButton size="lg" variant="primary">▶ View Pricing</PixelButton>
             </Link>
-            <Link href="/explore" onClick={() => sfx.click()}>
+            <Link href="/" onClick={() => sfx.click()}>
               <PixelButton size="lg" variant="ghost">◎ Explore Public Forms</PixelButton>
             </Link>
           </div>

@@ -51,8 +51,8 @@ function LoginPage() {
   };
 
   const useDemo = () => {
-    setValue("email", "kunal");
-    setValue("password", ",mad");
+    setValue("email", "kunal@example.com");
+    setValue("password", ",madoliya");
     sfx.coin();
     setErr(null);
   };
