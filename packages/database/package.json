@@ -7,15 +7,18 @@
     "dev": "dotenv -- drizzle-kit studio"
   },
   "devDependencies": {
+    "@eslint/js": "9.7.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/pg": "^8.23.1",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
+    "eslint": "9.7.0",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
+    "better-auth": "^1.7.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
