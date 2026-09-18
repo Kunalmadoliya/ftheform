@@ -4,6 +4,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().describe("DB URL"),
   BETTER_AUTH_SECRET: z.string().describe("Better Auth Secret"),
   BETTER_AUTH_URL: z.string().default("http://localhost:3000").describe("Better Auth URL"),
+  
+  GITHUB_CLIENT_ID: z.string().describe("GitHub Client ID"),
+  GITHUB_CLIENT_SECRET: z.string().describe("GitHub Client Secret"),
+
+  GOOGLE_CLIENT_ID: z.string().describe("Google Client ID"),
+  GOOGLE_CLIENT_SECRET: z.string().describe("Google Client Secret"),
+
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {
