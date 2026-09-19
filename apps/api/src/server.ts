@@ -12,18 +12,17 @@ import { env } from "./env";
 
 export const app = express();
 const openApiDocument = generateOpenApiDocument(serverRouter, {
-  title: "Streamyst OpenAPI",
+  title: "FTHEFORM",
   version: "1.0.0",
   baseUrl: env.BASE_URL.concat("/api"),
 });
 
-if (env.NODE_ENV !== "prod") {
-  app.use(
-    cors({
-      origin: "*",
-    }),
-  );
-}
+app.use(
+  cors({
+    origin: env.WEB_URL,
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
 
