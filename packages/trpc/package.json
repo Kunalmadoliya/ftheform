@@ -6,6 +6,7 @@
     "@eslint/js": "9.7.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/express": "^5.0.6",
     "dotenv-cli": "^11.0.0",
     "eslint": "9.7.0",
     "typescript": "^5.9.3"
@@ -14,6 +15,8 @@
     "@repo/services": "workspace:*",
     "@trpc/client": "^11.18.0",
     "@trpc/server": "^11.18.0",
+    "@repo/database": "workspace:*",
+    "better-auth": "^1.7.5",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "trpc-to-openapi": "^3.3.0",
