@@ -1,5 +1,10 @@
 import { auth } from "@repo/database/lib/auth";
 import { signInInput, SignInInputType, signUpInput, SignUpInputType } from "./model";
+import { createAuthClient } from "better-auth/client";
+
+const authClient = createAuthClient({
+   baseURL: "http://localhost:8000",
+});
 
 export default class authService {
   public async signIn(input: SignInInputType) {
@@ -18,5 +23,21 @@ export default class authService {
       body: { name, email, password },
     });
     return response;
+  }
+
+  public async googleSignIn() {
+    const googleRes = await authClient.signIn.social({
+       
+      provider: "google",
+    });
+
+    return googleRes;
+  }
+
+  public async githubSignIn() {
+    const githubRes = await authClient.signIn.social({
+      provider: "github",
+    });
+    return githubRes;
   }
 }

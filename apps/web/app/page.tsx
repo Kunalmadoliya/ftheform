@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSignin, useSignup } from "~/hooks/auth/use-auth";
+import { useGithubSignIn, useGoogleSignIn, useSignin, useSignup } from "~/hooks/auth/use-auth";
 
 export default function Home() {
   const [signInEmail, setSignInEmail] = useState("user@example.com");
@@ -13,6 +13,8 @@ export default function Home() {
 
   const { signInAsync: signIn, isPending: signingIn } = useSignin();
   const { signUpAsync: signUp, isPending: signingUp } = useSignup();
+  const { googleSignInAsync: googleSignIn, isPending: signingInWithGoogle } = useGoogleSignIn();
+  const { githubSignInAsync: githubSignIn, isPending: signingInWithGithub } = useGithubSignIn();
 
   const handleSignIn = async () => {
     try {
@@ -38,6 +40,26 @@ export default function Home() {
       setResult(`Sign-up success: ${JSON.stringify(response, null, 2)}`);
     } catch (error) {
       setResult(`Sign-up failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setResult("Calling Google sign-in...");
+      const response = await googleSignIn();
+      setResult(`Google sign-in success: ${JSON.stringify(response, null, 2)}`);
+    } catch (error) {
+      setResult(`Google sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    try {
+      setResult("Calling GitHub sign-in...");
+      const response = await githubSignIn();
+      setResult(`GitHub sign-in success: ${JSON.stringify(response, null, 2)}`);
+    } catch (error) {
+      setResult(`GitHub sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -77,6 +99,22 @@ export default function Home() {
                 className="w-full rounded-lg bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {signingIn ? "Calling /sign-in/email..." : "Sign In"}
+              </button>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={signingInWithGoogle}
+                className="w-full rounded-lg border border-slate-600 bg-white px-4 py-2 font-medium text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {signingInWithGoogle ? "Calling Google sign-in..." : "Continue with Google"}
+              </button>
+              <button
+                type="button"
+                onClick={handleGithubSignIn}
+                disabled={signingInWithGithub}
+                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {signingInWithGithub ? "Calling GitHub sign-in..." : "Continue with GitHub"}
               </button>
             </div>
           </section>

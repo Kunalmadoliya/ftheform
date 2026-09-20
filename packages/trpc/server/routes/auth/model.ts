@@ -38,3 +38,41 @@ export const signInOutput = z.object({
     updatedAt: z.date(),
   }),
 });
+
+const oauthUser = z.object({
+  id: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  email: z.string(),
+  emailVerified: z.boolean(),
+  name: z.string(),
+  image: z.string().nullable().optional(),
+});
+
+const oauthRedirectResult = z.object({
+  redirect: z.boolean(),
+  url: z.string(),
+});
+
+const oauthSessionResult = z.object({
+  redirect: z.boolean(),
+  token: z.string(),
+  url: z.undefined().optional(),
+  user: oauthUser,
+});
+
+const oauthSuccess = z.object({
+  data: z.union([oauthRedirectResult, oauthSessionResult]),
+  error: z.null(),
+});
+
+const oauthFailure = z.object({
+  data: z.null(),
+  error: z.object({
+    code: z.string().optional(),
+    message: z.string().optional(),
+  }),
+});
+
+export const googleSignInOutput = z.union([oauthSuccess, oauthFailure]);
+export const githubSignInOutput = googleSignInOutput; // same response shape as Google

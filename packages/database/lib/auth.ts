@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
+import { nextCookies } from "better-auth/next-js";
+
 import { db } from "../index";
 
 export const auth = betterAuth({
@@ -24,4 +26,5 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: "ftheform",
   },
+  plugins: [nextCookies()],
 });

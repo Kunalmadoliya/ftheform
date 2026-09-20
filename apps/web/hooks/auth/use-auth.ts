@@ -51,3 +51,55 @@ export function useSignup() {
     status,
   };
 }
+
+export function useGoogleSignIn() {
+  const {
+    mutateAsync: googleSignInAsync,
+    mutate: googleSignIn,
+    error,
+    failureCount,
+    isError,
+    isIdle,
+    isSuccess,
+    isPending,
+    status,
+  } = trpc.auth.googleSignIn.useMutation();
+
+  return {
+    googleSignInAsync,
+    googleSignIn,
+    error,
+    failureCount,
+    isError,
+    isIdle,
+    isSuccess,
+    isPending,
+    status,
+  };
+}
+
+export function useGithubSignIn() {
+  const {
+    mutateAsync: githubSignInAsync,
+    mutate: githubSignIn,
+    error,
+    failureCount,
+    isError,
+    isIdle,
+    isSuccess,
+    isPending,
+    status,
+  } = trpc.auth.githubSignIn.useMutation();
+
+  return {
+    githubSignInAsync,
+    githubSignIn,
+    error,
+    failureCount,
+    isError,
+    isIdle,
+    isSuccess,
+    isPending,
+    status,
+  };
+}
