@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const envSchema = z.object({
 
+  BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
+
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

@@ -2,14 +2,16 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { nextCookies } from "better-auth/next-js";
+import { env } from "../env";
 
 import { db } from "../index";
 
 export const auth = betterAuth({
+  baseURL: env.BASE_URL, // 👈 add this — must be your API server's URL, e.g. http://localhost:8000
+  trustedOrigins: ["http://localhost:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
-
   emailAndPassword: {
     enabled: true,
   },

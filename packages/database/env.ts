@@ -8,6 +8,9 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().describe("GitHub Client ID"),
   GITHUB_CLIENT_SECRET: z.string().describe("GitHub Client Secret"),
 
+  
+  BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
+
   GOOGLE_CLIENT_ID: z.string().describe("Google Client ID"),
   GOOGLE_CLIENT_SECRET: z.string().describe("Google Client Secret"),
 

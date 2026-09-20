@@ -10,11 +10,13 @@ export default function Home() {
   const [signUpPassword, setSignUpPassword] = useState("password123");
   const [signUpName, setSignUpName] = useState("Demo User");
   const [result, setResult] = useState<string>("No request sent yet.");
+  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
+  const [signingInWithGithub, setSigningInWithGithub] = useState(false);
 
   const { signInAsync: signIn, isPending: signingIn } = useSignin();
   const { signUpAsync: signUp, isPending: signingUp } = useSignup();
-  const { googleSignInAsync: googleSignIn, isPending: signingInWithGoogle } = useGoogleSignIn();
-  const { githubSignInAsync: githubSignIn, isPending: signingInWithGithub } = useGithubSignIn();
+  const { googleSignIn } = useGoogleSignIn();
+  const { githubSignIn } = useGithubSignIn();
 
   const handleSignIn = async () => {
     try {
@@ -45,21 +47,24 @@ export default function Home() {
 
   const handleGoogleSignIn = async () => {
     try {
-      setResult("Calling Google sign-in...");
-      const response = await googleSignIn();
-      setResult(`Google sign-in success: ${JSON.stringify(response, null, 2)}`);
+      setSigningInWithGoogle(true);
+      setResult("Redirecting to Google...");
+      await googleSignIn();
+      // No further code runs after this in practice — the browser navigates away to Google.
     } catch (error) {
       setResult(`Google sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
+      setSigningInWithGoogle(false);
     }
   };
 
   const handleGithubSignIn = async () => {
     try {
-      setResult("Calling GitHub sign-in...");
-      const response = await githubSignIn();
-      setResult(`GitHub sign-in success: ${JSON.stringify(response, null, 2)}`);
+      setSigningInWithGithub(true);
+      setResult("Redirecting to GitHub...");
+      await githubSignIn();
     } catch (error) {
       setResult(`GitHub sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
+      setSigningInWithGithub(false);
     }
   };
 
@@ -106,7 +111,7 @@ export default function Home() {
                 disabled={signingInWithGoogle}
                 className="w-full rounded-lg border border-slate-600 bg-white px-4 py-2 font-medium text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {signingInWithGoogle ? "Calling Google sign-in..." : "Continue with Google"}
+                {signingInWithGoogle ? "Redirecting to Google..." : "Continue with Google"}
               </button>
               <button
                 type="button"
@@ -114,7 +119,7 @@ export default function Home() {
                 disabled={signingInWithGithub}
                 className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {signingInWithGithub ? "Calling GitHub sign-in..." : "Continue with GitHub"}
+                {signingInWithGithub ? "Redirecting to GitHub..." : "Continue with GitHub"}
               </button>
             </div>
           </section>

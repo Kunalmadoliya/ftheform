@@ -1,4 +1,5 @@
 import { trpc } from "~/trpc/client";
+import { authClient } from "~/lib/auth-client";
 
 export function useSignin() {
   const {
@@ -53,53 +54,21 @@ export function useSignup() {
 }
 
 export function useGoogleSignIn() {
-  const {
-    mutateAsync: googleSignInAsync,
-    mutate: googleSignIn,
-    error,
-    failureCount,
-    isError,
-    isIdle,
-    isSuccess,
-    isPending,
-    status,
-  } = trpc.auth.googleSignIn.useMutation();
+  const googleSignIn = () =>
+    authClient.signIn.social({
+      provider: "google",
+      callbackURL: "/",
+    });
 
-  return {
-    googleSignInAsync,
-    googleSignIn,
-    error,
-    failureCount,
-    isError,
-    isIdle,
-    isSuccess,
-    isPending,
-    status,
-  };
+  return { googleSignIn };
 }
 
 export function useGithubSignIn() {
-  const {
-    mutateAsync: githubSignInAsync,
-    mutate: githubSignIn,
-    error,
-    failureCount,
-    isError,
-    isIdle,
-    isSuccess,
-    isPending,
-    status,
-  } = trpc.auth.githubSignIn.useMutation();
+  const githubSignIn = () =>
+    authClient.signIn.social({
+      provider: "github",
+      callbackURL: "/",
+    });
 
-  return {
-    githubSignInAsync,
-    githubSignIn,
-    error,
-    failureCount,
-    isError,
-    isIdle,
-    isSuccess,
-    isPending,
-    status,
-  };
+  return { githubSignIn };
 }

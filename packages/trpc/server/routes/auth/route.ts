@@ -44,32 +44,6 @@ export const authRouter = router({
     .mutation(async ({ input }) => {
       return authServiceInstance.signUp(input);
     }),
-
-  googleSignIn: publicProcedure
-    .meta({
-      openapi: {
-        method: "POST",
-        path: googleSignInPath("/sign-in/google"),
-        tags: TAGS,
-      },
-    })
-    .output(googleSignInOutput)
-    .mutation(async ({}) => {
-      return authServiceInstance.googleSignIn();
-    }),
-
-  githubSignIn: publicProcedure
-    .meta({
-      openapi: {
-        method: "POST",
-        path: githubSignInPath("/sign-in/github"),
-        tags: TAGS,
-      },
-    })
-    .output(githubSignInOutput)
-    .mutation(async ({}) => {
-      return authServiceInstance.githubSignIn();
-    }),
 });
 
 export type AuthRouter = typeof authRouter;

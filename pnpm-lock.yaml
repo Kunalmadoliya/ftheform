@@ -360,6 +360,9 @@ importers:
       '@trpc/react-query':
         specifier: ^11.18.0
         version: 11.18.0(@tanstack/react-query@5.103.1(react@19.3.0))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.18.0(typescript@5.9.3))(react@19.3.0)(typescript@5.9.3)
+      better-auth:
+        specifier: ^1.7.5
+        version: 1.7.5(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.6)(pg@8.23.0))(next@16.3.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
