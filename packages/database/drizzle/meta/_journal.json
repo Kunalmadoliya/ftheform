@@ -8,6 +8,13 @@
       "when": 1789915545571,
       "tag": "0000_lyrical_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790010633348,
+      "tag": "0001_luxuriant_scarecrow",
+      "breakpoints": true
     }
   ]
 }

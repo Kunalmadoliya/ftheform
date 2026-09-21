@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "../auth-schema";
-import { relations } from "..";
+import { relations } from "drizzle-orm";
 
 export const formStatus = pgEnum("status", ["filling", "submitted", "not_submitted"]);
 
@@ -85,6 +85,7 @@ export const submission = pgTable(
 
     status: formStatus("status").notNull().default("filling"),
     draftAnswer: jsonb("draft_answer"),
+    allowMultipleSubmissions : boolean("allow_multiple_submit").default(false) ,
     startedAt: timestamp("started_at").notNull().defaultNow(),
     lastActivity: timestamp("last_activity").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
@@ -116,15 +117,55 @@ export const answer = pgTable(
 );
 
 
-export const formRelation = relations(form , ({many}) => ({
-  formField : many(formField) , 
-  formSnapshot : many(formSnapshot)
-}))
+export const formRelation = relations(form, ({ one ,many }) => ({
+  formField: many(formField),
+  formSnapshot: many(formSnapshot),
+  submission: many(submission),
+  user: one(user, {                // ← missing
+    fields: [form.userId],
+    references: [user.id],
+  }),
+}));
 
-export const  fromSnapshotRelation = relations(formSnapshot , ({many}) => ({
- submission : many(submission)
-}))
+export const formFieldRelation = relations(formField, ({ one, many }) => ({
+  form: one(form, {
+    fields: [formField.formId],
+    references: [form.id],
+  }),
+  answer: many(answer),
+}));
 
-export const submissionRelation = relations(submission , ({}) => ({}))
+export const formSnapshotRelation = relations(formSnapshot, ({ one, many }) => ({
+  form: one(form, {
+    fields: [formSnapshot.formId],
+    references: [form.id],
+  }),
+  submission: many(submission),
+}));
 
-export const formFeild
+export const submissionRelation = relations(submission, ({ one, many }) => ({
+  form: one(form, {
+    fields: [submission.formId],
+    references: [form.id],
+  }),
+  snapshot: one(formSnapshot, {
+    fields: [submission.snapshotId],
+    references: [formSnapshot.id],
+  }),
+   user: one(user, {               
+    fields: [submission.userId],
+    references: [user.id],
+  }),
+  answer: many(answer),
+}));
+
+export const answerRelation = relations(answer, ({ one }) => ({
+  submission: one(submission, {
+    fields: [answer.submissionId],
+    references: [submission.id],
+  }),
+  formField: one(formField, {
+    fields: [answer.fieldId],
+    references: [formField.id],
+  }),
+}));
