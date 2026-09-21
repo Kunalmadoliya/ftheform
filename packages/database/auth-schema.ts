@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { pgEnum, pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { form, submission } from "./models/form-schema";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 
@@ -79,6 +80,8 @@ export const verification = pgTable(
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  form : many(form) ,
+  submission : many(submission)
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
