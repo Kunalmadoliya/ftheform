@@ -23,7 +23,10 @@ export const form = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     description: text("description"),
-    formUrl: text("form_url").notNull().unique(),
+    formUrl: text("form_url")
+      .notNull()
+      .unique()
+      .$defaultFn(() => crypto.randomUUID()),
     views: integer("views").notNull().default(0),
     currentVersion: integer("current_version").notNull().default(1),
     isPublished: boolean("is_published").notNull().default(false),
@@ -85,7 +88,7 @@ export const submission = pgTable(
 
     status: formStatus("status").notNull().default("filling"),
     draftAnswer: jsonb("draft_answer"),
-    allowMultipleSubmissions : boolean("allow_multiple_submit").default(false) ,
+    allowMultipleSubmissions: boolean("allow_multiple_submit").default(false),
     startedAt: timestamp("started_at").notNull().defaultNow(),
     lastActivity: timestamp("last_activity").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
@@ -116,12 +119,12 @@ export const answer = pgTable(
   (table) => [index("answer_submissionId_idx").on(table.submissionId)],
 );
 
-
-export const formRelation = relations(form, ({ one ,many }) => ({
+export const formRelation = relations(form, ({ one, many }) => ({
   formField: many(formField),
   formSnapshot: many(formSnapshot),
   submission: many(submission),
-  user: one(user, {                // ← missing
+  user: one(user, {
+    // ← missing
     fields: [form.userId],
     references: [user.id],
   }),
@@ -152,7 +155,7 @@ export const submissionRelation = relations(submission, ({ one, many }) => ({
     fields: [submission.snapshotId],
     references: [formSnapshot.id],
   }),
-   user: one(user, {               
+  user: one(user, {
     fields: [submission.userId],
     references: [user.id],
   }),

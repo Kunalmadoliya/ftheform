@@ -1,176 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useGithubSignIn, useGoogleSignIn, useSignin, useSignup } from "~/hooks/auth/use-auth";
+import Link from "next/link";
+import { ArrowRight, Check, FileText, LayoutTemplate, Sparkles } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import { authClient } from "~/lib/auth-client";
 
 export default function Home() {
-  const [signInEmail, setSignInEmail] = useState("user@example.com");
-  const [signInPassword, setSignInPassword] = useState("password123");
-  const [signUpEmail, setSignUpEmail] = useState("newuser@example.com");
-  const [signUpPassword, setSignUpPassword] = useState("password123");
-  const [signUpName, setSignUpName] = useState("Demo User");
-  const [result, setResult] = useState<string>("No request sent yet.");
-  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
-  const [signingInWithGithub, setSigningInWithGithub] = useState(false);
-
-  const { signInAsync: signIn, isPending: signingIn } = useSignin();
-  const { signUpAsync: signUp, isPending: signingUp } = useSignup();
-  const { googleSignIn } = useGoogleSignIn();
-  const { githubSignIn } = useGithubSignIn();
-
-  const handleSignIn = async () => {
-    try {
-      setResult("Calling /sign-in/email...");
-      const response = await signIn({
-        email: signInEmail,
-        password: signInPassword,
-      });
-      setResult(`Sign-in success: ${JSON.stringify(response, null, 2)}`);
-    } catch (error) {
-      setResult(`Sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
-
-  const handleSignUp = async () => {
-    try {
-      setResult("Calling /sign-up/email...");
-      const response = await signUp({
-        email: signUpEmail,
-        password: signUpPassword,
-        name: signUpName,
-      });
-      setResult(`Sign-up success: ${JSON.stringify(response, null, 2)}`);
-    } catch (error) {
-      setResult(`Sign-up failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setSigningInWithGoogle(true);
-      setResult("Redirecting to Google...");
-      await googleSignIn();
-      // No further code runs after this in practice — the browser navigates away to Google.
-    } catch (error) {
-      setResult(`Google sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
-      setSigningInWithGoogle(false);
-    }
-  };
-
-  const handleGithubSignIn = async () => {
-    try {
-      setSigningInWithGithub(true);
-      setResult("Redirecting to GitHub...");
-      await githubSignIn();
-    } catch (error) {
-      setResult(`GitHub sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
-      setSigningInWithGithub(false);
-    }
-  };
+  const { data: session } = authClient.useSession();
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-50">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <header>
-          <p className="text-sm uppercase tracking-[0.25em] text-cyan-400">FTHEFORM</p>
-          <h1 className="mt-3 text-3xl font-semibold">Auth route tester</h1>
-        </header>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h2 className="mb-4 text-xl font-medium text-cyan-300">Sign In</h2>
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1 block text-sm text-slate-300">Email</span>
-                <input
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-0"
-                  value={signInEmail}
-                  onChange={(e) => setSignInEmail(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm text-slate-300">Password</span>
-                <input
-                  type="password"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-0"
-                  value={signInPassword}
-                  onChange={(e) => setSignInPassword(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleSignIn}
-                disabled={signingIn}
-                className="w-full rounded-lg bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {signingIn ? "Calling /sign-in/email..." : "Sign In"}
-              </button>
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={signingInWithGoogle}
-                className="w-full rounded-lg border border-slate-600 bg-white px-4 py-2 font-medium text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {signingInWithGoogle ? "Redirecting to Google..." : "Continue with Google"}
-              </button>
-              <button
-                type="button"
-                onClick={handleGithubSignIn}
-                disabled={signingInWithGithub}
-                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {signingInWithGithub ? "Redirecting to GitHub..." : "Continue with GitHub"}
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h2 className="mb-4 text-xl font-medium text-violet-300">Sign Up</h2>
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1 block text-sm text-slate-300">Name</span>
-                <input
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-0"
-                  value={signUpName}
-                  onChange={(e) => setSignUpName(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm text-slate-300">Email</span>
-                <input
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-0"
-                  value={signUpEmail}
-                  onChange={(e) => setSignUpEmail(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm text-slate-300">Password</span>
-                <input
-                  type="password"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-0"
-                  value={signUpPassword}
-                  onChange={(e) => setSignUpPassword(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleSignUp}
-                disabled={signingUp}
-                className="w-full rounded-lg bg-violet-500 px-4 py-2 font-medium text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {signingUp ? "Calling /sign-up/email..." : "Sign Up"}
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <h3 className="mb-3 text-lg font-medium text-slate-200">Last response</h3>
-          <pre className="whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-4 text-sm text-cyan-200">
-            {result}
-          </pre>
-        </section>
-      </div>
+    <main className="min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_50%_-10%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_62%)]" />
+      <nav className="relative mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
+        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-[0.18em]"><span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Sparkles className="size-4" /></span>FTHEFORM</Link>
+        <div className="flex items-center gap-3">{session?.user ? <Button asChild><Link href="/dashboard">Go to Dashboard <ArrowRight /></Link></Button> : <><Button asChild variant="ghost"><Link href="/login">Log in</Link></Button><Button asChild><Link href="/sign-up">Sign up <ArrowRight /></Link></Button></>}</div>
+      </nav>
+      <section className="relative mx-auto grid max-w-7xl items-center gap-16 px-6 pb-24 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-10 lg:pb-32 lg:pt-24">
+        <div><p className="mb-6 flex items-center gap-2 text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground"><span className="size-2 rounded-full bg-chart-2" />Form building, made human</p><h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight sm:text-7xl">Ask better questions. <span className="text-muted-foreground">Get clearer answers.</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">FTHEFORM helps you create focused forms that feel easy to complete and simple to act on. Less friction for people. More signal for you.</p><div className="mt-9 flex flex-wrap gap-3">{session?.user ? <Button asChild size="lg"><Link href="/dashboard">Go to Dashboard <ArrowRight /></Link></Button> : <><Button asChild size="lg"><Link href="/sign-up">Start building <ArrowRight /></Link></Button><Button asChild size="lg" variant="outline"><Link href="/login">Log in</Link></Button></>}</div><div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted-foreground"><span className="flex items-center gap-2"><Check className="size-4 text-chart-2" />Quick to create</span><span className="flex items-center gap-2"><Check className="size-4 text-chart-2" />Easy to share</span><span className="flex items-center gap-2"><Check className="size-4 text-chart-2" />Ready to use</span></div></div>
+        <div className="relative min-h-[20rem] rounded-3xl border border-border bg-card p-5 shadow-2xl sm:p-8"><div className="absolute -right-5 -top-5 size-20 rounded-full border border-chart-2/30 bg-chart-2/10" /><div className="relative rounded-2xl border border-border bg-background p-5 sm:p-7"><div className="flex items-center justify-between border-b border-border pb-5"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">New form</p><h2 className="mt-2 text-xl font-semibold">Team pulse check-in</h2></div><FileText className="size-5 text-muted-foreground" /></div><div className="space-y-6 pt-6"><div><p className="text-sm font-medium">What should we keep doing?</p><div className="mt-3 h-10 rounded-md border border-border bg-muted/40" /></div><div><p className="text-sm font-medium">How are you feeling about the week?</p><div className="mt-3 grid grid-cols-3 gap-2"><div className="h-10 rounded-md border border-border bg-muted/40" /><div className="h-10 rounded-md border border-primary bg-primary/10" /><div className="h-10 rounded-md border border-border bg-muted/40" /></div></div><Button className="w-full">Publish form</Button></div></div></div>
+      </section>
+      <section className="relative border-t border-border bg-muted/30 px-6 py-20 lg:px-10"><div className="mx-auto max-w-7xl"><p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">A calmer way to collect input</p><div className="mt-10 grid gap-10 md:grid-cols-3"><div><LayoutTemplate className="size-5" /><h3 className="mt-5 text-lg font-semibold">Start with structure</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Shape a form around the decision you need to make, not a pile of fields.</p></div><div><Sparkles className="size-5" /><h3 className="mt-5 text-lg font-semibold">Keep it thoughtful</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">A focused experience invites better answers and respects people&apos;s time.</p></div><div><ArrowRight className="size-5" /><h3 className="mt-5 text-lg font-semibold">Move forward</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Turn responses into momentum with a workspace built for action.</p></div></div></div></section>
     </main>
   );
 }

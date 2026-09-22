@@ -7,7 +7,7 @@ export const tRPCContext = initTRPC.meta<OpenApiMeta>().context<typeof createCon
 
 export const router = tRPCContext.router;
 
-export const publicProcedure = tRPCContext.procedure;
+export const publicProcedure = tRPCContext.procedure
 
 export const authenticatedProcedure = tRPCContext.procedure.use(async (options) => {
   const { ctx } = options

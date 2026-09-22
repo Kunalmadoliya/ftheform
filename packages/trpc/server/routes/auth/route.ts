@@ -3,17 +3,14 @@ import {
   signInInput,
   signUpInput,
   signInOutput,
-  signUpOutput,
-  googleSignInOutput,
-  githubSignInOutput,
+  signUpOutput
 } from "./model";
 import { authServiceInstance } from "../../services";
 import { generatePath } from "../../utils/path-generator";
 
 const signInPath = generatePath("/");
 const signUpPath = generatePath("/");
-const googleSignInPath = generatePath("/");
-const githubSignInPath = generatePath("/");
+
 const TAGS = ["Authentication"];
 
 export const authRouter = router({
