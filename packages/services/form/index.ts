@@ -1,13 +1,32 @@
-import { db, eq, and } from "@repo/database";
+import { and, db, desc, eq } from "@repo/database";
 import {
   createInitialForm,
+  deleteForm,
   type CreateInitialFormType,
+  type DeleteFormType,
   getFormById,
   type GetFormByIdType,
+  listFormsByUser,
+  type ListFormsByUserType,
+  renameForm,
+  type RenameFormType,
+  updateFormDescription,
+  type UpdateFormDescriptionType,
 } from "./model";
 import { form } from "@repo/database/models/form-schema";
 
 export default class FormService {
+  private formSelection() {
+    return {
+      id: form.id,
+      title: form.title,
+      description: form.description,
+      formUrl: form.formUrl,
+      isPublished: form.isPublished,
+      createdAt: form.createdAt,
+    };
+  }
+
   public async createInitialForm(input: CreateInitialFormType) {
     const { title, description, userId } = await createInitialForm.parseAsync(input);
 
@@ -18,14 +37,7 @@ export default class FormService {
         description,
         userId,
       })
-      .returning({
-        id: form.id,
-        title: form.title,
-        description: form.description,
-        formUrl: form.formUrl,
-        isPublished: form.isPublished,
-        createdAt: form.createdAt,
-      });
+      .returning(this.formSelection());
 
     if (!newForm) {
       throw new Error("Form creation failed");
@@ -42,14 +54,7 @@ export default class FormService {
     }
 
     const [foundForm] = await db
-      .select({
-        id: form.id,
-        title: form.title,
-        description: form.description,
-        formUrl: form.formUrl,
-        isPublished: form.isPublished,
-        createdAt: form.createdAt,
-      })
+      .select(this.formSelection())
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
@@ -58,5 +63,62 @@ export default class FormService {
     }
 
     return foundForm;
+  }
+
+  public async renameForm(input: RenameFormType) {
+    const { formId, title, userId } = await renameForm.parseAsync(input);
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ title })
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async updateFormDescription(input: UpdateFormDescriptionType) {
+    const { formId, description, userId } = await updateFormDescription.parseAsync(input);
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ description })
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async deleteForm(input: DeleteFormType) {
+    const { formId, userId } = await deleteForm.parseAsync(input);
+
+    const [deletedForm] = await db
+      .delete(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning({ id: form.id });
+
+    if (!deletedForm) {
+      throw new Error("Form not found");
+    }
+
+    return deletedForm;
+  }
+
+  public async listFormsByUser(input: ListFormsByUserType) {
+    const { userId } = await listFormsByUser.parseAsync(input);
+
+    return db
+      .select(this.formSelection())
+      .from(form)
+      .where(eq(form.userId, userId))
+      .orderBy(desc(form.createdAt));
   }
 }

@@ -1,23 +1,40 @@
-import {z} from "zod";
+
+import { z } from "zod";
 
 export const createFormField = z.object({
-    formId: z.string().describe("form id"),
-    type: z.string().describe("form field type"),
-    category: z.string().describe("form field category"),
-    label: z.string().describe("form field label"),
-    required: z.boolean().default(false).describe("whether the form field is required"),
-    fieldOrder: z.number().int().describe("the order of the form field"),   
-    config: z.object({
-        options: z.array(z.string()).optional().describe("options for selection fields"),
-        placeholder: z.string().optional().describe("placeholder text for input fields"),
-    }).strict(),
- })
-
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+  type: z.string().describe("form field type"),
+  category: z.string().describe("form field category"),
+  label: z.string().describe("form field label"),
+  required: z.boolean().default(false).describe("whether the form field is required"),
+  config: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("type-specific settings for the field"),
+});
 
 export const listFormFields = z.object({
-    formId: z.string().describe("form id"),
-    userId : z.string().describe("user id"),
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+});
+
+
+export const updateForm  = z.object({
+formFieldId : z.string().describe("form field id"),
+formId: z.string().describe("form id"),
+userId: z.string().describe("user id"),
+ type: z.string().optional().describe("form field type"),
+ category: z.string().optional().describe("form field category"),
+ label: z.string().optional().describe("form field label"),
+  required: z.boolean().optional().describe("whether the form field is required"),
+  config: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("type-specific settings for the field"),
 })
 
+
+export type UpdateFormType = z.infer<typeof updateForm>;
 export type ListFormFieldsType = z.infer<typeof listFormFields>;
- export type CreateFormFieldType = z.infer<typeof createFormField>;
+export type CreateFormFieldType = z.infer<typeof createFormField>;

@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { nextCookies } from "better-auth/next-js";
 import { env } from "../env";
+import * as schema from "../auth-schema";
 
 import { db } from "../index";
 
@@ -11,6 +12,7 @@ export const auth = betterAuth({
   trustedOrigins: ["http://localhost:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
+    schema,
   }),
   emailAndPassword: {
     enabled: true,
