@@ -7,3 +7,10 @@ export const createInitialForm = z.object({
 });
 
 export type CreateInitialFormType = z.infer<typeof createInitialForm>;
+
+export const getFormById = z.object({
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+});
+
+export type GetFormByIdType = z.infer<typeof getFormById>;

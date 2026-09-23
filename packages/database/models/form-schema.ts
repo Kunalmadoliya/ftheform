@@ -18,7 +18,7 @@ export const form = pgTable(
   "form",
   {
     id: uuid("form_id").primaryKey().defaultRandom(),
-    title: text("title").notNull(),
+    title: text("title").notNull().default("Untitled Form"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -28,8 +28,10 @@ export const form = pgTable(
       .unique()
       .$defaultFn(() => crypto.randomUUID()),
     views: integer("views").notNull().default(0),
+    responseLimit: integer("response_limit").notNull().default(50),
     currentVersion: integer("current_version").notNull().default(1),
     isPublished: boolean("is_published").notNull().default(false),
+    isOpen: boolean("is_open").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -124,7 +126,6 @@ export const formRelation = relations(form, ({ one, many }) => ({
   formSnapshot: many(formSnapshot),
   submission: many(submission),
   user: one(user, {
-    // ← missing
     fields: [form.userId],
     references: [user.id],
   }),
