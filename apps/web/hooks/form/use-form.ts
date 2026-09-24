@@ -48,9 +48,9 @@ export function useForm() {
   };
 }
 
-export function useFormById(formId: string) {
+export function useFormById(formId: string, enabled = true) {
   return trpc.form.getFormById.useQuery(
     { formId },
-    { enabled: Boolean(formId) },
+    { enabled: Boolean(formId) && enabled, retry: false },
   );
 }
