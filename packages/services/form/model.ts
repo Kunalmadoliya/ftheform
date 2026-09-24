@@ -43,3 +43,19 @@ export const listFormsByUser = z.object({
 });
 
 export type ListFormsByUserType = z.infer<typeof listFormsByUser>;
+
+export const toggleFormOpenStatus = z.object({
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+  isOpen: z.boolean().describe("new form open status"),
+});
+
+export type ToggleFormOpenStatusType = z.infer<typeof toggleFormOpenStatus>;
+
+export const updateFormResponseLimit = z.object({
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+  responseLimit: z.number().int().min(1).describe("new form response limit"),
+});
+
+export type UpdateFormResponseLimitType = z.infer<typeof updateFormResponseLimit>;

@@ -14,3 +14,11 @@ export const signUpInput = z.object({
 
 export type SignUpInputType = z.infer<typeof signUpInput>;
 export type SignInInputType = z.infer<typeof signInInput>;
+
+export const updateFormResponseLimit = z.object({
+  formId: z.string().describe("form id"),
+  userRole: z.string().describe("user role"),
+  responseLimit: z.number().int().min(1).describe("new form response limit"),
+});
+
+export type UpdateFormResponseLimitType = z.infer<typeof updateFormResponseLimit>;

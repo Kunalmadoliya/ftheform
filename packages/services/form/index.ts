@@ -12,6 +12,8 @@ import {
   type RenameFormType,
   updateFormDescription,
   type UpdateFormDescriptionType,
+  toggleFormOpenStatus,
+  type ToggleFormOpenStatusType,
 } from "./model";
 import { form } from "@repo/database/models/form-schema";
 
@@ -120,5 +122,21 @@ export default class FormService {
       .from(form)
       .where(eq(form.userId, userId))
       .orderBy(desc(form.createdAt));
+  }
+
+  public async toggleFormOpenStatus(input: ToggleFormOpenStatusType) {
+    const { formId, userId, isOpen } = await toggleFormOpenStatus.parseAsync(input);
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ isOpen })
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
   }
 }
