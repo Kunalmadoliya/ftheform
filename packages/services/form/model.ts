@@ -59,3 +59,13 @@ export const updateFormResponseLimit = z.object({
 });
 
 export type UpdateFormResponseLimitType = z.infer<typeof updateFormResponseLimit>;
+
+
+export const publicForm = z.object({
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+  isPublished: z.boolean().describe("new form published status"),
+  title: z.string().describe("form title"),
+});
+
+export type PublicFormType = z.infer<typeof publicForm>;

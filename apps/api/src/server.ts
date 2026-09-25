@@ -2,7 +2,7 @@ import express from "express";
 import { logger } from "@repo/logger";
 import { auth } from "@repo/database/lib/auth";
 import cors from "cors";
-import { toNodeHandler , fromNodeHeaders } from "better-auth/node";
+import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { generateOpenApiDocument, createOpenApiExpressMiddleware } from "trpc-to-openapi";
@@ -26,6 +26,11 @@ app.use(
   }),
 );
 
+// 👇 better-auth route MUST be mounted before express.json(),
+// since toNodeHandler needs the raw, unparsed request stream.
+app.all("/api/auth/{*splat}", toNodeHandler(auth));
+
+// JSON parser for every other route, after the auth handler
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -37,10 +42,10 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/api/me", async (req, res) => {
- 	const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-	return res.json(session);
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  return res.json(session);
 });
 
 logger.debug(`openapi.json: ${env.BASE_URL}/openapi.json`);
@@ -50,8 +55,6 @@ app.get("/openapi.json", (req, res) => {
 
 logger.debug(`docs: ${env.BASE_URL}/docs`);
 app.use("/docs", apiReference({ url: "/openapi.json" }));
-
-app.all("/api/auth/{*splat}", toNodeHandler(auth));
 
 app.use(
   "/api",

@@ -10,6 +10,7 @@ const envSchema = z.object({
 
   
   BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
+  WEB_URL: z.string().default("http://localhost:3000").describe("Better Auth URL"),
 
   GOOGLE_CLIENT_ID: z.string().describe("Google Client ID"),
   GOOGLE_CLIENT_SECRET: z.string().describe("Google Client Secret"),

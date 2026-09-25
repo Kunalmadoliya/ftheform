@@ -4,7 +4,8 @@
   "scripts": {
     "db:migrate": "dotenv -- drizzle-kit migrate",
     "db:generate": "dotenv -- drizzle-kit generate",
-    "dev": "dotenv -- drizzle-kit studio"
+    "dev": "dotenv -- drizzle-kit studio" , 
+     "db:push": "drizzle-kit push"
   },
   "devDependencies": {
     "@eslint/js": "9.7.0",

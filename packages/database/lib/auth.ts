@@ -1,7 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
-import { nextCookies } from "better-auth/next-js";
 import { env } from "../env";
 import * as schema from "../auth-schema";
 
@@ -16,6 +15,8 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+     autoSignIn: false,
+    requireEmailVerification: true,
   },
   socialProviders: {
     github: {
@@ -30,5 +31,4 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: "ftheform",
   },
-  plugins: [nextCookies()],
 });

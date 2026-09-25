@@ -3,6 +3,7 @@ import { z } from "zod";
 const envSchema = z.object({
 
   BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
+  WEB_URL: z.string().default("http://localhost:3000").describe("Web URL"),
 
 });
 

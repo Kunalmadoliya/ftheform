@@ -1,4 +1,4 @@
-import { and, db, desc, eq } from "@repo/database";
+import { and, db, desc, eq, sql } from "@repo/database";
 import {
   createInitialForm,
   deleteForm,
@@ -14,8 +14,11 @@ import {
   type UpdateFormDescriptionType,
   toggleFormOpenStatus,
   type ToggleFormOpenStatusType,
+  publicForm,
+  type PublicFormType,
 } from "./model";
 import { form } from "@repo/database/models/form-schema";
+import {env} from "../env"
 
 export default class FormService {
   private formSelection() {
@@ -130,6 +133,58 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ isOpen })
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async incrementFormViewCount(formId: string) {
+    const updatedForm = await db
+      .update(form)
+      .set({ views: sql`{form.views} + 1` })
+      .where(eq(form.id, formId))
+      .returning({ id: form.id, views: form.views });
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async publicForm(input: PublicFormType) {
+    const { formId, userId, isPublished  , title} = await publicForm.parseAsync(input);
+      
+      const publishFormURL = env.WEB_URL + "/form/" + formId + title.replace(/\s+/g, "-").toLowerCase();
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ formUrl: publishFormURL, isPublished })
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async unpublishForm(input: PublicFormType) {
+    const { formId, userId, isPublished } = await publicForm.parseAsync(input);
+
+    if(!isPublished){
+      throw new Error("Form is already unpublished");
+    }
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ isPublished : false })
       .where(and(eq(form.id, formId), eq(form.userId, userId)))
       .returning(this.formSelection());
 
