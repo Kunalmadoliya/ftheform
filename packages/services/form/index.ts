@@ -18,7 +18,7 @@ import {
   type PublicFormType,
 } from "./model";
 import { form } from "@repo/database/models/form-schema";
-import {env} from "../env"
+import { env } from "../env";
 
 export default class FormService {
   private formSelection() {
@@ -53,10 +53,6 @@ export default class FormService {
 
   public async getFormById(input: GetFormByIdType) {
     const { formId, userId } = await getFormById.parseAsync(input);
-
-    if (!formId || !userId) {
-      throw new Error("Form ID and User ID are required");
-    }
 
     const [foundForm] = await db
       .select(this.formSelection())
@@ -144,9 +140,9 @@ export default class FormService {
   }
 
   public async incrementFormViewCount(formId: string) {
-    const updatedForm = await db
+    const [updatedForm] = await db
       .update(form)
-      .set({ views: sql`{form.views} + 1` })
+      .set({ views: sql`${form.views} + 1` })
       .where(eq(form.id, formId))
       .returning({ id: form.id, views: form.views });
 
@@ -157,14 +153,15 @@ export default class FormService {
     return updatedForm;
   }
 
-  public async publicForm(input: PublicFormType) {
-    const { formId, userId, isPublished  , title} = await publicForm.parseAsync(input);
-      
-      const publishFormURL = env.WEB_URL + "/form/" + formId + title.replace(/\s+/g, "-").toLowerCase();
+  public async publishForm(input: PublicFormType) {
+    const { formId, userId, title } = await publicForm.parseAsync(input);
+
+    const slug = title.replace(/\s+/g, "-").toLowerCase();
+    const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
 
     const [updatedForm] = await db
       .update(form)
-      .set({ formUrl: publishFormURL, isPublished })
+      .set({ formUrl: publishFormURL, isPublished: true })
       .where(and(eq(form.id, formId), eq(form.userId, userId)))
       .returning(this.formSelection());
 
@@ -176,15 +173,26 @@ export default class FormService {
   }
 
   public async unpublishForm(input: PublicFormType) {
-    const { formId, userId, isPublished } = await publicForm.parseAsync(input);
+    const { formId, userId } = await publicForm.parseAsync(input);
 
-    if(!isPublished){
+    // check the form's ACTUAL current state in the DB, never trust
+    // an isPublished value coming from client input for this decision
+    const [existingForm] = await db
+      .select({ isPublished: form.isPublished })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+
+    if (!existingForm) {
+      throw new Error("Form not found");
+    }
+
+    if (!existingForm.isPublished) {
       throw new Error("Form is already unpublished");
     }
 
     const [updatedForm] = await db
       .update(form)
-      .set({ isPublished : false })
+      .set({ isPublished: false })
       .where(and(eq(form.id, formId), eq(form.userId, userId)))
       .returning(this.formSelection());
 

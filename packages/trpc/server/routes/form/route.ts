@@ -1,4 +1,4 @@
-import { authenticatedProcedure } from "../../trpc";
+import { protectedProcedure } from "../../trpc";
 import {
   createInitialFormInput,
   createInitialFormOutput,
@@ -6,10 +6,18 @@ import {
   deleteFormOutput,
   getFormByIdInput,
   getFormByIdOutput,
+  incrementFormViewCountInput,
+  incrementFormViewCountOutput,
   listFormsByUserOutput,
+  publishFormInput,
+  publishFormOutput,
   renameFormInput,
   updateFormDescriptionInput,
   updateFormOutput,
+  unpublishFormInput,
+  unpublishFormOutput,
+  toggleFormOpenStatusInput,
+  toggleFormOpenStatusOutput,
 } from "./model";
 import { formServiceInstance } from "../../services";
 import { generatePath } from "../../utils/path-generator";
@@ -21,7 +29,7 @@ const formsPath = generatePath("/form");
 const TAGS = ["Form"];
 
 export const formRouter = {
-  createInitialForm: authenticatedProcedure
+  createInitialForm: protectedProcedure
     .meta({
       openapi: {
         method: "POST",
@@ -35,16 +43,14 @@ export const formRouter = {
     .mutation(async ({ ctx, input }) => {
       const { title, description } = input;
 
-      const { id } = await formServiceInstance.createInitialForm({
+      return formServiceInstance.createInitialForm({
         title,
         description,
-        userId: ctx.user.id,
+        userId: ctx.userId,
       });
-
-      return { id };
     }),
 
-  getFormById: authenticatedProcedure
+  getFormById: protectedProcedure
     .meta({
       openapi: {
         method: "GET",
@@ -60,13 +66,13 @@ export const formRouter = {
 
       const formById = await formServiceInstance.getFormById({
         formId,
-        userId: ctx.user.id,
+        userId: ctx.userId,
       });
 
       return formById;
     }),
 
-  renameForm: authenticatedProcedure
+  renameForm: protectedProcedure
     .meta({
       openapi: {
         method: "PATCH",
@@ -80,11 +86,11 @@ export const formRouter = {
     .mutation(async ({ ctx, input }) =>
       formServiceInstance.renameForm({
         ...input,
-        userId: ctx.user.id,
+        userId: ctx.userId,
       }),
     ),
 
-  updateFormDescription: authenticatedProcedure
+  updateFormDescription: protectedProcedure
     .meta({
       openapi: {
         method: "PATCH",
@@ -98,11 +104,11 @@ export const formRouter = {
     .mutation(async ({ ctx, input }) =>
       formServiceInstance.updateFormDescription({
         ...input,
-        userId: ctx.user.id,
+        userId: ctx.userId,
       }),
     ),
 
-  deleteForm: authenticatedProcedure
+  deleteForm: protectedProcedure
     .meta({
       openapi: {
         method: "DELETE",
@@ -116,11 +122,11 @@ export const formRouter = {
     .mutation(async ({ ctx, input }) =>
       formServiceInstance.deleteForm({
         ...input,
-        userId: ctx.user.id,
+        userId: ctx.userId,
       }),
     ),
 
-  listFormsByUser: authenticatedProcedure
+  listFormsByUser: protectedProcedure
     .meta({
       openapi: {
         method: "GET",
@@ -132,7 +138,77 @@ export const formRouter = {
     .output(listFormsByUserOutput)
     .query(({ ctx }) =>
       formServiceInstance.listFormsByUser({
-        userId: ctx.user.id,
+        userId: ctx.userId,
+      }),
+    ),
+
+  toggleFormOpenStatus: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: formsPath("/:formId/open-status"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(toggleFormOpenStatusInput)
+    .output(toggleFormOpenStatusOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.toggleFormOpenStatus({
+        ...input,
+        userId: ctx.userId,
+      }),
+    ),
+
+  incrementFormViewCount: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: formsPath("/:formId/view"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(incrementFormViewCountInput)
+    .output(incrementFormViewCountOutput)
+    .mutation(({ input }) => formServiceInstance.incrementFormViewCount(input.formId)),
+
+  publishForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: formsPath("/:formId/publish"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(publishFormInput)
+    .output(publishFormOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.publishForm({
+        ...input,
+        userId: ctx.userId,
+        isPublished: true,
+      }),
+    ),
+
+  unpublishForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: formsPath("/:formId/unpublish"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(unpublishFormInput)
+    .output(unpublishFormOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.unpublishForm({
+        ...input,
+        userId: ctx.userId,
+        isPublished: false,
+        title: "",
       }),
     ),
 };

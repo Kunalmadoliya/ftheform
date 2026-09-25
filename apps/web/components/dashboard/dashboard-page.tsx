@@ -48,7 +48,7 @@ export function DashboardPage() {
     setError("");
     try {
       const form = await createFormAsync({ title: "Untitled Form" });
-      router.push(`/builder/${form.id}`);
+      router.push(`/forms/${form.id}/builder`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create the form.");
     }

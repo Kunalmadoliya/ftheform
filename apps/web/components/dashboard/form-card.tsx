@@ -64,7 +64,7 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete }: FormCardPro
         <span>Updated {updatedAt.toLocaleDateString()}</span>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button asChild className="flex-1"><Link href={`/builder/${form.id}`}><Pencil />Edit</Link></Button>
+        <Button asChild className="flex-1"><Link href={`/forms/${form.id}/builder`}><Pencil />Edit</Link></Button>
         <Button variant="outline" size="icon" onClick={copyShareLink} disabled={!form.formUrl} aria-label="Copy share link"><ExternalLink /></Button>
       </CardFooter>
     </Card>

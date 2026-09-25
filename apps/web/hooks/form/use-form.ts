@@ -26,6 +26,16 @@ export function useForm() {
   const deleteFormMutation = trpc.form.deleteForm.useMutation({
     onSuccess: () => utils.form.listFormsByUser.invalidate(),
   });
+  const toggleFormOpenStatusMutation = trpc.form.toggleFormOpenStatus.useMutation({
+    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+  });
+  const incrementFormViewCountMutation = trpc.form.incrementFormViewCount.useMutation();
+  const publishFormMutation = trpc.form.publishForm.useMutation({
+    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+  });
+  const unpublishFormMutation = trpc.form.unpublishForm.useMutation({
+    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+  });
 
   return {
     forms: formsQuery.data ?? [],
@@ -38,6 +48,14 @@ export function useForm() {
     updateFormDescriptionAsync: updateFormDescriptionMutation.mutateAsync,
     deleteForm: deleteFormMutation.mutate,
     deleteFormAsync: deleteFormMutation.mutateAsync,
+    toggleFormOpenStatus: toggleFormOpenStatusMutation.mutate,
+    toggleFormOpenStatusAsync: toggleFormOpenStatusMutation.mutateAsync,
+    incrementFormViewCount: incrementFormViewCountMutation.mutate,
+    incrementFormViewCountAsync: incrementFormViewCountMutation.mutateAsync,
+    publishForm: publishFormMutation.mutate,
+    publishFormAsync: publishFormMutation.mutateAsync,
+    unpublishForm: unpublishFormMutation.mutate,
+    unpublishFormAsync: unpublishFormMutation.mutateAsync,
     error,
     failureCount,
     isError,

@@ -9,14 +9,15 @@ export const router = tRPCContext.router;
 
 export const publicProcedure = tRPCContext.procedure
 
-export const authenticatedProcedure = tRPCContext.procedure.use(async (options) => {
+export const protectedProcedure = tRPCContext.procedure.use(async (options) => {
   const { ctx } = options
 
   const session = ctx.session
   const user =  ctx.user
+  const userId = ctx.userId
 
   
-  if (!session || !user) {
+  if (!session || !user || !userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
@@ -24,11 +25,13 @@ export const authenticatedProcedure = tRPCContext.procedure.use(async (options) 
     ctx: {
       ...ctx,
       session,
-      user
-      ,
+      user,
+      userId,
     },
   });
 });
+
+export const authenticatedProcedure = protectedProcedure;
 
 
 

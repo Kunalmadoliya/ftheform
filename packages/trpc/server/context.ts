@@ -6,6 +6,7 @@ type SessionResponse = NonNullable<Awaited<ReturnType<typeof auth.api.getSession
 export interface ContextUser {
   session: SessionResponse["session"] | null;
   user: SessionResponse["user"] | null;
+  userId: string | null;
 }
 
 export async function createContext({
@@ -19,6 +20,7 @@ export async function createContext({
   return {
     session: authSession?.session ?? null,
     user: authSession?.user ?? null,
+    userId: authSession?.user.id ?? null,
   };
 }
 export type Context = ContextUser;
