@@ -27,6 +27,7 @@ userId: z.string().describe("user id"),
  type: z.string().optional().describe("form field type"),
  category: z.string().optional().describe("form field category"),
  label: z.string().optional().describe("form field label"),
+  fieldOrder: z.number().optional().describe("form field order"),
   required: z.boolean().optional().describe("whether the form field is required"),
   config: z
     .record(z.string(), z.unknown())

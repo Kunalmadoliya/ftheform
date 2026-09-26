@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Globe2 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -19,6 +19,13 @@ import { Input } from "~/components/ui/input";
 export function ShareFormDialog({ open, onOpenChange, formUrl, isPublished, isPublishing, onPublish }: ShareFormDialogProps) {
   const [shareUrl, setShareUrl] = useState(formUrl ?? "");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setShareUrl(formUrl ?? "");
+      setCopied(false);
+    }
+  }, [formUrl, open]);
 
   async function handlePublish() {
     const publishedUrl = await onPublish();

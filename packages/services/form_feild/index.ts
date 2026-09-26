@@ -108,7 +108,7 @@ export default class FormFieldService {
   }
 
   public async updateFormField(input: UpdateFormType) {
-    const { formFieldId, formId, type, category, label, required, config, userId } =
+    const { formFieldId, formId, type, category, label, required, config, userId , fieldOrder } =
       await updateForm.parseAsync(input);
 
     await this.validateFormOwnership(formId, userId);
@@ -121,6 +121,7 @@ export default class FormFieldService {
         label,
         required,
         config,
+        fieldOrder,
       })
       .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))
       .returning();
@@ -165,3 +166,7 @@ export default class FormFieldService {
     return deletedField;
   }
 }
+
+
+
+

@@ -43,7 +43,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     setDescription(form.description ?? "");
     setSavedTitle(form.title);
     setSavedDescription(form.description ?? "");
-    setPublishedUrl(form.formUrl ?? null);
+    setPublishedUrl(form.isPublished ? form.formUrl : null);
   }, [form?.id]);
 
   useEffect(() => {
@@ -87,23 +87,33 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       setIsPublishing(false);
     }
   }
+  async function handleShare() {
+    setShareOpen(true);
+    if (!form?.isPublished) await publishForm();
+  }
   async function addField(definition: FieldTypeDefinition) {
-    const field = await createFieldAsync({ formId, type: definition.type, category: "input", label: definition.label, required: false });
+    const config = definition.type === "select" || definition.type === "multiselect" ? { options: ["Option 1"] } : definition.type === "rating" ? { maxStars: 5 } : {};
+    const field = await createFieldAsync({ formId, type: definition.type, category: "input", label: definition.label, required: false, config });
     setSelectedFieldId(field.id);
   }
-  async function saveField(updates: { label: string; required: boolean }) {
+  async function saveField(updates: { label: string; required: boolean; config: Record<string, unknown> }) {
     if (!selectedField) return;
-    await updateFieldAsync({ formId, formFieldId: selectedField.id, label: updates.label, required: updates.required });
+    await updateFieldAsync({ formId, formFieldId: selectedField.id, label: updates.label, required: updates.required, config: updates.config });
   }
   async function deleteSelectedField() {
     if (!selectedField) return;
     await deleteFieldAsync({ formId, formFieldId: selectedField.id });
     setSelectedFieldId(undefined);
   }
+  async function deleteFieldFromCanvas(field: BuilderField) {
+    if (!window.confirm(`Delete "${field.label}"? This cannot be undone.`)) return;
+    await deleteFieldAsync({ formId, formFieldId: field.id });
+    if (selectedFieldId === field.id) setSelectedFieldId(undefined);
+  }
 
   if (!isSessionPending && !session?.user) return null;
   if (formQuery.isError) return <div className="p-8"><p className="text-sm text-destructive">Unable to load this form.</p><button className="mt-4 text-sm underline" onClick={() => router.push("/dashboard")}>Back to dashboard</button></div>;
   if (isSessionPending || formQuery.isPending || !form) return <div className="p-8 text-sm text-muted-foreground">Loading form...</div>;
 
-  return <div className="flex min-h-screen flex-col bg-background"><BuilderHeader title={displayTitle} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onPreview={() => setPreviewOpen(true)} onShare={() => setShareOpen(true)} /><FormSettingsBar isPublished={form.isPublished} isOpen={isOpen} responseLimit={50} onOpenChange={(nextIsOpen) => void handleOpenChange(nextIsOpen)} /><div className="flex min-h-0 flex-1 flex-col lg:flex-row"><FieldTypePalette onAdd={(definition) => void addField(definition)} /><FormCanvas fields={fields as BuilderField[]} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onAdd={() => void addField(fieldTypes[0]!)} /><FieldInspector field={selectedField} onSave={saveField} onDelete={deleteSelectedField} /></div>{fieldsQuery.isFetching ? <p className="fixed bottom-4 right-4 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">Saving...</p> : null}<FormPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} title={title} description={description} fields={fields as BuilderField[]} /><ShareFormDialog open={shareOpen} onOpenChange={setShareOpen} formUrl={publishedUrl} isPublished={Boolean(publishedUrl) && form.isPublished} isPublishing={isPublishing} onPublish={publishForm} /></div>;
+  return <div className="flex min-h-screen flex-col bg-background"><BuilderHeader title={displayTitle} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onPreview={() => setPreviewOpen(true)} onShare={() => void handleShare()} /><FormSettingsBar isPublished={form.isPublished || Boolean(publishedUrl)} isOpen={isOpen} responseLimit={50} onOpenChange={(nextIsOpen) => void handleOpenChange(nextIsOpen)} /><div className="flex min-h-0 flex-1 flex-col lg:flex-row"><FieldTypePalette onAdd={(definition) => void addField(definition)} /><FormCanvas fields={fields as BuilderField[]} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onEdit={(field) => setSelectedFieldId(field.id)} onDelete={(field) => void deleteFieldFromCanvas(field)} onAdd={() => void addField(fieldTypes[0]!)} /><FieldInspector field={selectedField} onSave={saveField} onDelete={deleteSelectedField} /></div>{fieldsQuery.isFetching ? <p className="fixed bottom-4 right-4 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">Saving...</p> : null}<FormPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} title={title} description={description} fields={fields as BuilderField[]} /><ShareFormDialog open={shareOpen} onOpenChange={setShareOpen} formUrl={publishedUrl} isPublished={form.isPublished || Boolean(publishedUrl)} isPublishing={isPublishing} onPublish={publishForm} /></div>;
 }
