@@ -8,6 +8,7 @@ import {
   type UpdateFormType,
 } from "./model";
 import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
+import { version } from "zod/v4/core";
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -33,6 +34,31 @@ export default class FormFieldService {
         .where(eq(formField.formId, formId))
         .orderBy(asc(formField.fieldOrder));
 
+      const [formVersion] = await tx
+        .select({ currentVersion: form.currentVersion })
+        .from(form)
+        .where(eq(form.id, formId))
+        .limit(1);
+
+      if (!formVersion) {
+        throw new Error("Form not found");
+      }
+
+      let currentVersion = formVersion.currentVersion;
+      
+      const [newSnapshot] = await tx
+        .insert(formSnapshot)
+        .values({
+          formId,
+          versions: [currentVersion],
+          fieldsJson: currentFields,
+        })
+        .returning();
+
+      if (!newSnapshot) {
+        throw new Error("Failed to create form snapshot");
+      }
+
       const [updatedForm] = await tx
         .update(form)
         .set({ currentVersion: sql<number>`${form.currentVersion} + 1` })
@@ -41,19 +67,6 @@ export default class FormFieldService {
 
       if (!updatedForm) {
         throw new Error("Having issues updating the form version");
-      }
-
-      const [newSnapshot] = await tx
-        .insert(formSnapshot)
-        .values({
-          formId,
-          version: updatedForm.currentVersion,
-          fieldsJson: currentFields,
-        })
-        .returning();
-
-      if (!newSnapshot) {
-        throw new Error("Failed to create form snapshot");
       }
 
       return newSnapshot;
@@ -108,7 +121,7 @@ export default class FormFieldService {
   }
 
   public async updateFormField(input: UpdateFormType) {
-    const { formFieldId, formId, type, category, label, required, config, userId , fieldOrder } =
+    const { formFieldId, formId, type, category, label, required, config, userId, fieldOrder } =
       await updateForm.parseAsync(input);
 
     await this.validateFormOwnership(formId, userId);
@@ -166,7 +179,3 @@ export default class FormFieldService {
     return deletedField;
   }
 }
-
-
-
-
