@@ -91,7 +91,7 @@ CREATE TABLE "form_field" (
 CREATE TABLE "form_snapshot" (
 	"form_snapshot_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"form_id" uuid NOT NULL,
-	"form_versions" integer[] NOT NULL,
+	"form_versions" integer NOT NULL,
 	"fields_json" jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );

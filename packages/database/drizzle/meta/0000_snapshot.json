@@ -1,5 +1,5 @@
 {
-  "id": "90d28146-3e92-429a-8dc3-e694eb611d50",
+  "id": "e85fcd1e-a5b0-4526-b2bc-fcc11ca7ede8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -724,7 +724,7 @@
         },
         "form_versions": {
           "name": "form_versions",
-          "type": "integer[]",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },

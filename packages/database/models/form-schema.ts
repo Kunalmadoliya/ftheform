@@ -47,7 +47,7 @@ export const formSnapshot = pgTable(
     formId: uuid("form_id")
       .notNull()
       .references(() => form.id, { onDelete: "cascade" }),
-    versions: integer("form_versions").array().notNull(),
+    versions: integer("form_versions").notNull(),
     fieldsJson: jsonb("fields_json").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
