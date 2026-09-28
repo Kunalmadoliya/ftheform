@@ -5,7 +5,7 @@ import {
   type getFormSnapshotInputType,
 } from "./model";
 import { formSnapshot, form } from "@repo/database/models/form-schema";
-import { and, db, eq } from "@repo/database";
+import { and, db, desc, eq } from "@repo/database";
 
 export default class FormSnapshot {
   public async getLatestFormSnapshotById(input: getFormSnapshotType) {
@@ -31,6 +31,7 @@ export default class FormSnapshot {
       .select()
       .from(formSnapshot)
       .where(and(eq(form.id, formId), eq(formSnapshot.id, formSnapshotId)))
+      .orderBy(desc(formSnapshot.createdAt))
       .limit(1);
 
     if (!checkFormSnapshot) {
@@ -39,5 +40,22 @@ export default class FormSnapshot {
 
     return checkFormSnapshot;
   }
-  
+
+  public async listFormSnapshots(formId: string) {
+    if (!formId) {
+      throw new Error("Form id is required");
+    }
+
+    const snapshots = await db
+      .select()
+      .from(formSnapshot)
+      .where(eq(formSnapshot.formId, formId))
+      .orderBy(desc(formSnapshot.createdAt));
+
+    if (!snapshots) {
+      throw new Error("No snapshots found for this form");
+    }
+
+    return snapshots;
+  }
 }
