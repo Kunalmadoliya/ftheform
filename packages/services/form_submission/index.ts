@@ -1,6 +1,11 @@
 import { form, formSnapshot, submission } from "@repo/database/schema";
-import { and, db, eq } from "@repo/database";
-import { validateSubmittedFormVersion, type validateSubmittedFormVersionType } from "./model";
+import { and, db, desc, eq } from "@repo/database";
+import {
+  validateSubmittedFormVersion,
+  type validateSubmittedFormVersionType,
+  startSubmissionFormSchema,
+  type startSubmissionFormSchemaType,
+} from "./model";
 
 export default class FormSubmission {
   private async validateFormVersion(input: validateSubmittedFormVersionType) {
@@ -32,22 +37,100 @@ export default class FormSubmission {
     return matchingSnapshot;
   }
 
-  public async startSubmissionForm(formId: string) {
-    if (!formId) {
-      throw new Error("Form id is required");
-    }
+  public async startSubmissionForm(input: startSubmissionFormSchemaType) {
+    const { formId } = await startSubmissionFormSchema.parseAsync(input);
 
     const matchingSnapshot = await this.validateFormVersion({ formId });
 
-    if (!matchingSnapshot) {
-      throw new Error("Form with current version not found try to contact the form owner to update the form");
-    }
-    
-    const createFormSubmission = await db.insert(submission).values({
-      formId,
-      snapshotId: matchingSnapshot.id,
-    }).returning();
+    const [newSubmission] = await db
+      .insert(submission)
+      .values({
+        formId,
+        snapshotId: matchingSnapshot.id,
+        status: "filling",
+        submittedAt: null,
+      })
+      .returning();
 
-    return createFormSubmission;
+    if (!newSubmission) {
+      throw new Error("Failed to start submission");
+    }
+
+    return newSubmission;
+  }
+
+  public async getActiveSubmission(formId: string) {
+    const activeSubmission = await db
+      .select()
+      .from(submission)
+      .where(and(eq(submission.formId, formId), eq(submission.status, "filling")));
+
+    if (!activeSubmission) {
+      throw new Error("Active submission not found");
+    }
+
+    return activeSubmission;
+  }
+
+  public async submitForm(formId: string, submissionId: string) {
+    const matchingSnapshot = await this.validateFormVersion({ formId });
+
+    const [updatedSubmission] = await db
+      .update(submission)
+      .set({
+        snapshotId: matchingSnapshot.id,
+        status: "submitted",
+        submittedAt: new Date(),
+      })
+      .where(eq(submission.id, submissionId))
+      .returning();
+
+    if (!updatedSubmission) {
+      throw new Error("Failed to submit form");
+    }
+
+    return updatedSubmission;
+  }
+
+  public async getSubmissionById(submissionId: string) {
+    const [submissionRecord] = await db
+      .select()
+      .from(submission)
+      .where(eq(submission.id, submissionId));
+
+    if (!submissionRecord) {
+      throw new Error("Submission not found");
+    }
+
+    return submissionRecord;
+  }
+
+  public async listSubmissionsByFormId(formId: string) {
+    return db
+      .select()
+      .from(submission)
+      .where(eq(submission.formId, formId))
+      .orderBy(desc(submission.startedAt));
+  }
+
+  public async markSubmissionAsNotSubmitted(submissionId: string) {
+    const getActiveSubmission = await this.getSubmissionById(submissionId);
+
+
+    if (getActiveSubmission.status === "filling" && getActiveSubmission.startedAt < new Date(Date.now() - 3 * 60 * 60 * 1000)) {
+      const [updatedSubmission] = await db
+        .update(submission)
+        .set({
+          status: "not_submitted",
+        })
+        .where(eq(submission.id, submissionId))
+        .returning();
+
+      if (!updatedSubmission) {
+        throw new Error("Failed to mark submission as not submitted");
+      }
+
+      return updatedSubmission;
+    }
   }
 }
