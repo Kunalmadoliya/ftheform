@@ -20,7 +20,7 @@ import { authClient } from "~/lib/auth-client";
 export function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending: isSessionPending } = authClient.useSession();
-  const { createFormAsync, deleteFormAsync, forms, formsQuery, isPending, renameFormAsync, updateFormDescriptionAsync } = useForm();
+  const { createFormAsync, deleteFormAsync, forms, formsQuery, isPending, renameFormAsync, updateFormDescriptionAsync, publishFormAsync, unpublishFormAsync } = useForm();
   const [dialog, setDialog] = useState<"edit" | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -59,6 +59,15 @@ export function DashboardPage() {
     if (window.confirm("Delete this form? This cannot be undone.")) await deleteFormAsync({ formId });
   }
 
+  async function handlePublish(formId: string) {
+    const form = forms.find((item) => item.id === formId);
+    if (form) await publishFormAsync({ formId, title: form.title });
+  }
+
+  async function handleUnpublish(formId: string) {
+    await unpublishFormAsync({ formId });
+  }
+
   async function handleSignOut() { await authClient.signOut(); router.replace("/"); }
   if (isSessionPending || !session?.user) return null;
 
@@ -86,7 +95,7 @@ export function DashboardPage() {
           </div>
           <section className="space-y-4">
             <div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold">Your forms</h2><p className="mt-1 text-sm text-muted-foreground">Create, edit, and share your forms.</p></div>{formsQuery.isPending ? <span className="text-sm text-muted-foreground">Loading...</span> : null}</div>
-            <FormsGrid forms={formSummaries} onEdit={openEdit} onDelete={handleDelete} />
+            <FormsGrid forms={formSummaries} onEdit={openEdit} onDelete={handleDelete} onPublish={handlePublish} onUnpublish={handleUnpublish} />
           </section>
         </div>
       </main>

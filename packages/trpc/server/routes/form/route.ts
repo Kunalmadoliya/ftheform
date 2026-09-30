@@ -1,4 +1,4 @@
-import { protectedProcedure } from "../../trpc";
+import { protectedProcedure, publicProcedure } from "../../trpc";
 import {
   createInitialFormInput,
   createInitialFormOutput,
@@ -6,6 +6,7 @@ import {
   deleteFormOutput,
   getFormByIdInput,
   getFormByIdOutput,
+  getPublicFormByIdOutput,
   incrementFormViewCountInput,
   incrementFormViewCountOutput,
   listFormsByUserOutput,
@@ -71,6 +72,18 @@ export const formRouter = {
 
       return formById;
     }),
+
+  getPublicFormById: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getFormByIdPath("/public/:formId"),
+        tags: TAGS,
+      },
+    })
+    .input(getFormByIdInput)
+    .output(getPublicFormByIdOutput)
+    .query(({ input }) => formServiceInstance.getPublicFormById(input)),
 
   renameForm: protectedProcedure
     .meta({
@@ -160,13 +173,12 @@ export const formRouter = {
       }),
     ),
 
-  incrementFormViewCount: protectedProcedure
+  incrementFormViewCount: publicProcedure
     .meta({
       openapi: {
         method: "POST",
         path: formsPath("/:formId/view"),
         tags: TAGS,
-        protect: true,
       },
     })
     .input(incrementFormViewCountInput)

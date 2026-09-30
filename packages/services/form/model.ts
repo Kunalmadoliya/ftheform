@@ -15,6 +15,12 @@ export const getFormById = z.object({
 
 export type GetFormByIdType = z.infer<typeof getFormById>;
 
+export const getPublicFormById = z.object({
+  formId: z.string().describe("form id"),
+});
+
+export type GetPublicFormByIdType = z.infer<typeof getPublicFormById>;
+
 export const renameForm = z.object({
   formId: z.string().describe("form id"),
   title: z.string().min(1).describe("new form title"),

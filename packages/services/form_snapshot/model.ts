@@ -1,5 +1,5 @@
 
-import {z} from 'zod';
+import { z } from "zod";
 
 export const getLatestFormSnapshotById = z.object({
   formId: z.string().describe("form id"),
@@ -14,4 +14,10 @@ export const getLatestFormSnapshotInput = z.object({
 });
 
 export type getFormSnapshotInputType = z.infer<typeof getLatestFormSnapshotInput>;
+
+export const createSnapshotInput = z.object({
+  formId: z.string(),
+});
+
+export type createSnapshotInputType = z.infer<typeof createSnapshotInput>;
 

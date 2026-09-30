@@ -1,4 +1,4 @@
-import { and, db, desc, eq, sql } from "@repo/database";
+import { and, asc, db, desc, eq, sql } from "@repo/database";
 import {
   createInitialForm,
   deleteForm,
@@ -6,6 +6,8 @@ import {
   type DeleteFormType,
   getFormById,
   type GetFormByIdType,
+  getPublicFormById,
+  type GetPublicFormByIdType,
   listFormsByUser,
   type ListFormsByUserType,
   renameForm,
@@ -17,7 +19,7 @@ import {
   publicForm,
   type PublicFormType,
 } from "./model";
-import { form } from "@repo/database/models/form-schema";
+import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
 import { env } from "../env";
 
 export default class FormService {
@@ -63,6 +65,17 @@ export default class FormService {
       throw new Error("Form not found");
     }
 
+    return foundForm;
+  }
+
+  public async getPublicFormById(input: GetPublicFormByIdType) {
+    const { formId } = await getPublicFormById.parseAsync(input);
+    const [foundForm] = await db
+      .select({ ...this.formSelection(), isOpen: form.isOpen })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.isPublished, true)));
+
+    if (!foundForm) throw new Error("Form not found");
     return foundForm;
   }
 
@@ -159,17 +172,43 @@ export default class FormService {
     const slug = title.replace(/\s+/g, "-").toLowerCase();
     const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
 
-    const [updatedForm] = await db
-      .update(form)
-      .set({ formUrl: publishFormURL, isPublished: true })
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
-      .returning(this.formSelection());
+    return db.transaction(async (tx) => {
+      const [updatedForm] = await tx
+        .update(form)
+        .set({
+          formUrl: publishFormURL,
+          isPublished: true,
+          currentVersion: sql<number>`${form.currentVersion} + 1`,
+        })
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .returning({ ...this.formSelection(), currentVersion: form.currentVersion });
 
-    if (!updatedForm) {
-      throw new Error("Form not found");
-    }
+      if (!updatedForm) {
+        throw new Error("Form not found");
+      }
 
-    return updatedForm;
+      const fields = await tx
+        .select()
+        .from(formField)
+        .where(eq(formField.formId, formId))
+        .orderBy(asc(formField.fieldOrder));
+
+      const [snapshot] = await tx
+        .insert(formSnapshot)
+        .values({
+          formId,
+          versions: updatedForm.currentVersion,
+          fieldsJson: fields,
+        })
+        .returning({ id: formSnapshot.id });
+
+      if (!snapshot) {
+        throw new Error("Failed to create form snapshot");
+      }
+
+      const { currentVersion: _currentVersion, ...publishedForm } = updatedForm;
+      return publishedForm;
+    });
   }
 
   public async unpublishForm(input: PublicFormType) {

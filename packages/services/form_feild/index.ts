@@ -7,9 +7,7 @@ import {
   updateForm,
   type UpdateFormType,
 } from "./model";
-import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+import { form, formField } from "@repo/database/models/form-schema";
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -21,53 +19,6 @@ export default class FormFieldService {
     if (!owns) {
       throw new Error("Form not found or does not belong to the user");
     }
-  }
-
-  private async isFormPublished(tx: Tx, formId: string) {
-    const [row] = await tx
-      .select({ isPublished: form.isPublished })
-      .from(form)
-      .where(eq(form.id, formId));
-
-    return row?.isPublished ?? false;
-  }
-
-  // must run INSIDE the caller's transaction so the field change,
-  // the version bump and the snapshot all commit or roll back together
-  private async createSnapshotAndBumpVersion(tx: Tx, formId: string) {
-    // bump first: the atomic UPDATE locks the form row, so two concurrent
-    // edits can never receive the same version number
-    const [updatedForm] = await tx
-      .update(form)
-      .set({ currentVersion: sql<number>`${form.currentVersion} + 1` })
-      .where(eq(form.id, formId))
-      .returning({ currentVersion: form.currentVersion });
-
-    if (!updatedForm) {
-      throw new Error("Form not found");
-    }
-
-    // read fields AFTER the edit and the bump, so the snapshot holds the new state
-    const currentFields = await tx
-      .select()
-      .from(formField)
-      .where(eq(formField.formId, formId))
-      .orderBy(asc(formField.fieldOrder));
-
-    const [newSnapshot] = await tx
-      .insert(formSnapshot)
-      .values({
-        formId,
-        versions: updatedForm.currentVersion,
-        fieldsJson: currentFields,
-      })
-      .returning();
-
-    if (!newSnapshot) {
-      throw new Error("Failed to create form snapshot");
-    }
-
-    return newSnapshot;
   }
 
   public async listFormFields(input: ListFormFieldsType) {
@@ -105,10 +56,6 @@ export default class FormFieldService {
         throw new Error("Form field creation failed");
       }
 
-      if (await this.isFormPublished(tx, formId)) {
-        await this.createSnapshotAndBumpVersion(tx, formId);
-      }
-
       return newField;
     });
   }
@@ -128,10 +75,6 @@ export default class FormFieldService {
 
       if (!updatedFormField) {
         throw new Error("Form field not found");
-      }
-
-      if (await this.isFormPublished(tx, formId)) {
-        await this.createSnapshotAndBumpVersion(tx, formId);
       }
 
       return updatedFormField;
@@ -167,10 +110,6 @@ export default class FormFieldService {
           .where(and(eq(formField.id, id), eq(formField.formId, formId)));
       }
 
-      if (await this.isFormPublished(tx, formId)) {
-        await this.createSnapshotAndBumpVersion(tx, formId);
-      }
-
       return { reordered: orderedFieldIds.length };
     });
   }
@@ -186,10 +125,6 @@ export default class FormFieldService {
 
       if (!deletedField) {
         throw new Error("Form field not found");
-      }
-
-      if (await this.isFormPublished(tx, formId)) {
-        await this.createSnapshotAndBumpVersion(tx, formId);
       }
 
       return deletedField;

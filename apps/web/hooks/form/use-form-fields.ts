@@ -16,6 +16,9 @@ export function useFormFields(formId: string) {
   const deleteFieldMutation = trpc.formField.deleteFormField.useMutation({
     onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
   });
+  const reorderFieldMutation = trpc.formField.reorderFormFields.useMutation({
+    onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
+  });
 
   return {
     fields: fieldsQuery.data ?? [],
@@ -26,8 +29,11 @@ export function useFormFields(formId: string) {
     updateFieldAsync: updateFieldMutation.mutateAsync,
     deleteField: deleteFieldMutation.mutate,
     deleteFieldAsync: deleteFieldMutation.mutateAsync,
+    reorderFields: reorderFieldMutation.mutate,
+    reorderFieldsAsync: reorderFieldMutation.mutateAsync,
     isCreating: createFieldMutation.isPending,
     isUpdating: updateFieldMutation.isPending,
     isDeleting: deleteFieldMutation.isPending,
+    isReordering: reorderFieldMutation.isPending,
   };
 }

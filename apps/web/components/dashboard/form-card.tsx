@@ -23,9 +23,11 @@ type FormCardProps = {
   fieldCount?: number;
   onEdit: () => void;
   onDelete: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
 };
 
-export function FormCard({ form, fieldCount = 0, onEdit, onDelete }: FormCardProps) {
+export function FormCard({ form, fieldCount = 0, onEdit, onDelete, onPublish, onUnpublish }: FormCardProps) {
   async function copyShareLink() {
     if (form.formUrl) await navigator.clipboard.writeText(form.formUrl);
   }
@@ -48,6 +50,7 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete }: FormCardPro
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}><Pencil />Edit details</DropdownMenuItem>
               <DropdownMenuItem onClick={copyShareLink} disabled={!form.formUrl}><Copy />Copy share link</DropdownMenuItem>
+              {form.isPublished ? <DropdownMenuItem onClick={onUnpublish}>Unpublish</DropdownMenuItem> : <DropdownMenuItem onClick={onPublish}>Publish</DropdownMenuItem>}
               <DropdownMenuItem className="text-destructive" onClick={onDelete}><Trash2 />Delete form</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

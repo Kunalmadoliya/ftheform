@@ -10,6 +10,8 @@ import {
   listFormFieldsOutput,
   updateFormFieldInput,
   updateFormFieldOutput,
+  reorderFormFieldsInput,
+  reorderFormFieldsOutput,
 } from "./model";
 
 const formFieldsPath = generatePath("/form/:formId/fields");
@@ -83,5 +85,20 @@ export const formFieldRouter = {
     .output(deleteFormFieldOutput)
     .mutation(({ ctx, input }) =>
       formFieldServiceInstance.deleteFormField(input.formId, input.formFieldId, ctx.user.id),
+    ),
+
+  reorderFormFields: authenticatedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: formFieldsPath("/reorder"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(reorderFormFieldsInput)
+    .output(reorderFormFieldsOutput)
+    .mutation(({ ctx, input }) =>
+      formFieldServiceInstance.reorderFormFields(input.formId, input.orderedFieldIds, ctx.user.id),
     ),
 };

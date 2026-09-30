@@ -22,6 +22,10 @@ export const getFormByIdInput = z.object({
 
 export const getFormByIdOutput = formOutput;
 
+export const getPublicFormByIdOutput = formOutput.extend({
+  isOpen: z.boolean(),
+});
+
 export const renameFormInput = z.object({
   formId: z.string().describe("The id of the form"),
   title: z.string().min(1).describe("The new title of the form"),

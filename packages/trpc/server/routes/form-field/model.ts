@@ -51,3 +51,12 @@ export const deleteFormFieldInput = z.object({
 export const deleteFormFieldOutput = z.object({
   id: z.string(),
 });
+
+export const reorderFormFieldsInput = z.object({
+  formId: z.string(),
+  orderedFieldIds: z.array(z.string()),
+});
+
+export const reorderFormFieldsOutput = z.object({
+  reordered: z.number(),
+});
