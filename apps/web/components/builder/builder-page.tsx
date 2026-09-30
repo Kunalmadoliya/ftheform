@@ -88,8 +88,8 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     }
   }
   async function handleShare() {
+    if (!form?.isPublished && !publishedUrl) await publishForm();
     setShareOpen(true);
-    if (!form?.isPublished) await publishForm();
   }
   async function addField(definition: FieldTypeDefinition) {
     const config = definition.type === "select" || definition.type === "multiselect" ? { options: ["Option 1"] } : definition.type === "rating" ? { maxStars: 5 } : {};
@@ -115,5 +115,20 @@ export function BuilderPage({ formId }: BuilderPageProps) {
   if (formQuery.isError) return <div className="p-8"><p className="text-sm text-destructive">Unable to load this form.</p><button className="mt-4 text-sm underline" onClick={() => router.push("/dashboard")}>Back to dashboard</button></div>;
   if (isSessionPending || formQuery.isPending || !form) return <div className="p-8 text-sm text-muted-foreground">Loading form...</div>;
 
-  return <div className="flex min-h-screen flex-col bg-background"><BuilderHeader title={displayTitle} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onPreview={() => setPreviewOpen(true)} onShare={() => void handleShare()} /><FormSettingsBar isPublished={form.isPublished || Boolean(publishedUrl)} isOpen={isOpen} responseLimit={50} onOpenChange={(nextIsOpen) => void handleOpenChange(nextIsOpen)} /><div className="flex min-h-0 flex-1 flex-col lg:flex-row"><FieldTypePalette onAdd={(definition) => void addField(definition)} /><FormCanvas fields={fields as BuilderField[]} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onEdit={(field) => setSelectedFieldId(field.id)} onDelete={(field) => void deleteFieldFromCanvas(field)} onAdd={() => void addField(fieldTypes[0]!)} /><FieldInspector field={selectedField} onSave={saveField} onDelete={deleteSelectedField} /></div>{fieldsQuery.isFetching ? <p className="fixed bottom-4 right-4 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">Saving...</p> : null}<FormPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} title={title} description={description} fields={fields as BuilderField[]} /><ShareFormDialog open={shareOpen} onOpenChange={setShareOpen} formUrl={publishedUrl} isPublished={form.isPublished || Boolean(publishedUrl)} isPublishing={isPublishing} onPublish={publishForm} /></div>;
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <BuilderHeader title={displayTitle} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onPreview={() => setPreviewOpen(true)} onShare={() => void handleShare()} />
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <FieldTypePalette onAdd={(definition) => void addField(definition)} />
+        <FormCanvas fields={fields as BuilderField[]} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onEdit={(field) => setSelectedFieldId(field.id)} onDelete={(field) => void deleteFieldFromCanvas(field)} onAdd={() => void addField(fieldTypes[0]!)} />
+        <aside className="border-t bg-background lg:w-80 lg:shrink-0 lg:border-l lg:border-t-0">
+          <FormSettingsBar isPublished={form.isPublished || Boolean(publishedUrl)} isOpen={isOpen} responseLimit={50} onOpenChange={(nextIsOpen) => void handleOpenChange(nextIsOpen)} />
+          <FieldInspector field={selectedField} onSave={saveField} onDelete={deleteSelectedField} />
+        </aside>
+      </div>
+      {fieldsQuery.isFetching ? <p className="fixed bottom-4 right-4 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">Saving...</p> : null}
+      <FormPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} title={title} description={description} fields={fields as BuilderField[]} />
+      <ShareFormDialog open={shareOpen} onOpenChange={setShareOpen} formUrl={publishedUrl} isPublished={form.isPublished || Boolean(publishedUrl)} isPublishing={isPublishing} />
+    </div>
+  );
 }

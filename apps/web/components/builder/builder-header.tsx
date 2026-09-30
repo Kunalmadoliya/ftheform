@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Eye, Globe2 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { ThemeToggle } from "~/components/theme-toggle";
 
 type BuilderHeaderProps = {
   title: string;
@@ -35,6 +36,7 @@ export function BuilderHeader({ title, onTitleChange, onTitleSave, onPreview, on
         {savedAt ? `Saved ${savedAt}` : "Saved"}
       </span>
       <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
         <Button variant="outline" size="sm" onClick={onPreview}>
           <Eye />
           Preview

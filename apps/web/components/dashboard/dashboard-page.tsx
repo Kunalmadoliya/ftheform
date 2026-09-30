@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
+import { ThemeToggle } from "~/components/theme-toggle";
 import { useForm } from "~/hooks/form/use-form";
 import { authClient } from "~/lib/auth-client";
 
@@ -69,7 +70,7 @@ export function DashboardPage() {
       <main className="min-w-0 flex-1">
         <header className="flex h-16 items-center justify-between border-b bg-background px-6 lg:px-10">
           <p className="text-sm text-muted-foreground">Workspace</p>
-          <Button variant="ghost" size="sm" onClick={handleSignOut}><LogOut />Sign out</Button>
+          <div className="flex items-center gap-2"><ThemeToggle /><Button variant="ghost" size="sm" onClick={handleSignOut}><LogOut />Sign out</Button></div>
         </header>
         <div className="mx-auto max-w-7xl space-y-10 px-6 py-10 lg:px-10">
           <div className="flex flex-wrap items-end justify-between gap-4">

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -45,30 +47,43 @@ export function FormCanvas({
   onDelete,
   onAdd,
 }: FormCanvasProps) {
+  const [detailsOpen, setDetailsOpen] = useState(!title.trim());
+
   return (
     <section className="min-w-0 flex-1 bg-muted/30 p-6 lg:p-10">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-10 min-h-32 space-y-3 border-b pb-5">
-          <p className="text-lg font-medium uppercase px-2 tracking-wider text-muted-foreground">
-            Build the form
-          </p>
-          <Input
-             className="!text-lg !h-18 bg-transparent rounded-xl font-semibold"
-            value={title}
-            onChange={(event) => onTitleChange(event.target.value)}
-            onBlur={onTitleSave}
-            aria-label="Form title"
-            placeholder="Untitled form"
-          />
-          <Textarea
-             className="!text-sm !h-20 bg-transparent rounded-xl font-normal"
-            value={description}
-            onChange={(event) => onDescriptionChange(event.target.value)}
-            onBlur={onDescriptionSave}
-            aria-label="Form description"
-            placeholder="Add a short description for your audience"
-          />
-        </div>
+        <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="mb-8 border-b pb-5">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="px-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Build the form
+              </p>
+              <Input
+                className="mt-1 h-12 rounded-xl border-transparent bg-transparent px-2 text-lg font-semibold shadow-none focus-visible:border-input"
+                value={title}
+                onChange={(event) => onTitleChange(event.target.value)}
+                onBlur={onTitleSave}
+                aria-label="Form title"
+                placeholder="Untitled form"
+              />
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="shrink-0">
+                {detailsOpen ? "Hide description" : "Add description"}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="pt-3">
+            <Textarea
+              className="min-h-20 rounded-xl bg-background/60 text-sm"
+              value={description}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+              onBlur={onDescriptionSave}
+              aria-label="Form description"
+              placeholder="Add a short description for your audience"
+            />
+          </CollapsibleContent>
+        </Collapsible>
         <div className="space-y-3">
           {fields.length === 0 ? (
             <Card className="border-dashed">

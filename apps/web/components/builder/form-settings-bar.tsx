@@ -8,5 +8,28 @@ import { Switch } from "~/components/ui/switch";
 type FormSettingsBarProps = { isPublished: boolean; isOpen: boolean; responseLimit: number; onOpenChange: (isOpen: boolean) => void };
 
 export function FormSettingsBar({ isPublished, isOpen, responseLimit, onOpenChange }: FormSettingsBarProps) {
-  return <div className="flex flex-wrap items-end gap-4 border-b bg-muted/20 px-6 py-3"><Badge variant={isPublished ? "default" : "secondary"}>{isPublished ? "Published" : "Draft"}</Badge><div className="space-y-1"><Label className="text-xs text-muted-foreground" htmlFor="limit">Response limit</Label><Input id="limit" type="number" value={responseLimit} readOnly aria-readonly="true" className="h-8 w-28 bg-muted" /></div><label className="flex h-8 items-center gap-2 text-sm"><Switch checked={isOpen} onCheckedChange={onOpenChange} />Accept submissions</label></div>;
+  return (
+    <section className="space-y-4 border-b p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Form settings</p>
+          <p className="text-xs text-muted-foreground">Control access and availability.</p>
+        </div>
+        <Badge variant={isPublished ? "default" : "secondary"}>
+          {isPublished ? "Published" : "Draft"}
+        </Badge>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground" htmlFor="limit">
+          Response limit
+        </Label>
+        <Input id="limit" type="number" value={responseLimit} readOnly aria-readonly="true" className="bg-muted" />
+        <p className="text-[11px] text-muted-foreground">Set by your workspace plan.</p>
+      </div>
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span>Accept submissions</span>
+        <Switch checked={isOpen} onCheckedChange={onOpenChange} />
+      </label>
+    </section>
+  );
 }

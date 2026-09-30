@@ -138,21 +138,21 @@ export function FormPreviewDialog({
 }: FormPreviewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b bg-muted/30 px-6 py-5">
           <DialogTitle>{title || "Untitled form"}</DialogTitle>
           <DialogDescription>
             {description || "Preview how your form will appear to respondents."}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5">
+        <div className="space-y-5 px-6 py-6">
           {fields.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               Add a field to see it in the preview.
             </div>
           ) : (
             fields.map((field, index) => (
-              <div key={field.id} className="space-y-2 rounded-lg border p-4">
+              <div key={field.id} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
                 <Label htmlFor={`preview-${field.id}`}>
                   <span className="mr-2 text-xs text-muted-foreground">
                     {String(index + 1).padStart(2, "0")}
@@ -165,7 +165,7 @@ export function FormPreviewDialog({
             ))
           )}
           {fields.length > 0 ? (
-            <Button type="button" className="w-full" disabled>
+            <Button type="button" className="w-full" variant="secondary" disabled>
               <Check />
               Preview only
             </Button>
