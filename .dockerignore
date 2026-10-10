@@ -1,0 +1,28 @@
+# Dependencies are installed inside the builder.
+**/node_modules
+
+# Build outputs are created inside the builder.
+**/dist
+**/.next
+**/.turbo
+**/build
+**/coverage
+
+# Secrets and local environment files
+.env*
+**/.env*
+
+# Git and editor files
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# logs
+**/*.log
+
+# Docker files and compose config are not runtime inputs.
+**/Dockerfile*
+docker-compose*.yml
+.dockerignore

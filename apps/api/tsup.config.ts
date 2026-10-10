@@ -4,8 +4,8 @@ export default defineConfig({
   entry: ["./src/index.ts"],
   // Use CommonJS because the package has no "type": "module" and Node runs dist/index.js directly.
   format: "cjs",
-  // The root package declares Node 18 as its minimum supported runtime.
-  target: "node18",
+  // The production Docker images run Node 22.
+  target: "node22",
   outDir: "dist",
   clean: true,
   sourcemap: true,
