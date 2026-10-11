@@ -57,7 +57,7 @@ export function useGoogleSignIn() {
   const googleSignIn = () =>
     authClient.signIn.social({
       provider: "google",
-      callbackURL: "/",
+      callbackURL: `${window.location.origin}/`,
     });
 
   return { googleSignIn };
@@ -67,7 +67,7 @@ export function useGithubSignIn() {
   const githubSignIn = () =>
     authClient.signIn.social({
       provider: "github",
-      callbackURL: "/",
+      callbackURL: `${window.location.origin}/`,
     });
 
   return { githubSignIn };

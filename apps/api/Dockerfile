@@ -17,8 +17,8 @@ CMD ["pnpm", "--filter", "@repo/database", "db:migrate"]
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=prod PORT=4000
+ENV NODE_ENV=production PORT=
 COPY --from=builder --chown=node:node /repo/apps/api/dist ./dist
 USER node
-EXPOSE 4000
+EXPOSE 3000
 CMD ["node", "dist/index.js"]

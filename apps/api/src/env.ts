@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  PORT: z.string().optional(),
-  NODE_ENV: z.enum(["development", "prod"]).default("development"),
-  BASE_URL: z.string().default("http://localhost:8000"),
+  PORT: z.string().optional().default("4000"),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  BASE_URL: z.string().default("http://localhost:4000"),
   WEB_URL: z.string().default("http://localhost:3000"),
 });
 

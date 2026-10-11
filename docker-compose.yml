@@ -42,7 +42,7 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     environment:
-      NODE_ENV: prod
+      NODE_ENV: production
       PORT: 4000
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL with host postgresdb in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
