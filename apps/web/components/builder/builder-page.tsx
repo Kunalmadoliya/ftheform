@@ -250,6 +250,11 @@ export function BuilderPage({ formId }: BuilderPageProps) {
         isPublished={form.isPublished || Boolean(publishedUrl)}
         isPublishing={isPublishing}
       />
+      {form.isPublished && form.hasUnpublishedChanges ? (
+        <p className="border-b bg-muted px-6 py-3 text-sm text-muted-foreground" role="status">
+          Unpublished changes — publish again to update the live form.
+        </p>
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <FieldTypePalette onAdd={(definition) => void addField(definition)} />
         <FormCanvas fields={[...(fields as BuilderField[])].sort((a, b) => a.fieldOrder - b.fieldOrder)} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onEdit={(field) => setSelectedFieldId(field.id)} onDelete={(field) => void deleteFieldFromCanvas(field)} onMove={(field, direction) => void moveField(field, direction)} onReorder={(orderedFieldIds) => void reorderFields(orderedFieldIds)} onAdd={() => void addField(fieldTypes[0]!)} />

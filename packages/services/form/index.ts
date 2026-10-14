@@ -32,6 +32,7 @@ import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
 import { fieldSetHash } from "./snapshot-utils";
+import { slugifyFormTitle } from "./slug-utils";
 import { serviceError } from "../errors";
 
 const formSnapshotService = new FormSnapshotService();
@@ -42,7 +43,7 @@ export default class FormService {
       id: form.id,
       title: form.title,
       description: form.description,
-      formUrl: form.formUrl,
+      formUrl: sql<string>`${env.WEB_URL.replace(/\/+$/, "")} || '/form/' || ${form.formUrl}`,
       isPublished: form.isPublished,
       isOpen: form.isOpen,
       responseLimit: form.responseLimit,
@@ -78,7 +79,7 @@ export default class FormService {
     const { formId, userId } = await getFormById.parseAsync(input);
 
     const [foundForm] = await db
-      .select(this.formSelection())
+      .select({ ...this.formSelection(), currentVersion: form.currentVersion })
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
@@ -86,7 +87,27 @@ export default class FormService {
       throw serviceError("NOT_FOUND", "Form not found");
     }
 
-    return foundForm;
+    let hasUnpublishedChanges = false;
+    if (foundForm.isPublished) {
+      const [currentSnapshot] = await db
+        .select({ fieldsJson: formSnapshot.fieldsJson })
+        .from(formSnapshot)
+        .where(and(
+          eq(formSnapshot.formId, formId),
+          eq(formSnapshot.versions, foundForm.currentVersion),
+        ))
+        .orderBy(desc(formSnapshot.createdAt))
+        .limit(1);
+      const currentFields = await db
+        .select()
+        .from(formField)
+        .where(eq(formField.formId, formId))
+        .orderBy(formField.fieldOrder);
+      hasUnpublishedChanges = !currentSnapshot ||
+        fieldSetHash(currentFields) !== fieldSetHash(currentSnapshot.fieldsJson);
+    }
+    const { currentVersion: _currentVersion, ...ownedForm } = foundForm;
+    return { ...ownedForm, hasUnpublishedChanges };
   }
 
   public async getPublicFormById(input: GetPublicFormByIdType, userId?: string | null) {
@@ -303,6 +324,21 @@ export default class FormService {
         .from(formField)
         .where(eq(formField.formId, formId))
         .orderBy(formField.fieldOrder);
+      if (currentFields.length === 0) {
+        throw serviceError("BAD_REQUEST", "Add at least one field before publishing this form");
+      }
+      if (currentFields.some((field) => !field.label.trim())) {
+        throw serviceError("BAD_REQUEST", "Every field needs a non-empty label before publishing");
+      }
+      if (currentFields.some((field) => {
+        if (field.type !== "select" && field.type !== "multiselect") return false;
+        if (!field.config || typeof field.config !== "object" || Array.isArray(field.config)) return true;
+        const options = (field.config as { options?: unknown }).options;
+        return !Array.isArray(options) || options.length === 0 ||
+          options.some((option) => typeof option !== "string" || !option.trim());
+      })) {
+        throw serviceError("BAD_REQUEST", "Every select field needs at least one non-empty option");
+      }
       const [currentSnapshot] = await tx
         .select({ fieldsJson: formSnapshot.fieldsJson })
         .from(formSnapshot)
@@ -314,8 +350,7 @@ export default class FormService {
         .limit(1);
       const unchanged = currentSnapshot !== undefined &&
         fieldSetHash(currentFields) === fieldSetHash(currentSnapshot.fieldsJson);
-      const slug = currentForm.title.trim().replace(/\s+/g, "-").toLowerCase();
-      const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
+      const publishFormURL = `${formId}-${slugifyFormTitle(currentForm.title)}`;
       const [updatedForm] = await tx
         .update(form)
         .set({

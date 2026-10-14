@@ -43,6 +43,13 @@
       "when": 1791973043300,
       "tag": "0005_daffy_matthew_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791973561976,
+      "tag": "0006_normalize_published_form_slugs",
+      "breakpoints": true
     }
   ]
 }

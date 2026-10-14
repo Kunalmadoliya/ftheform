@@ -8,16 +8,28 @@ export function useFormFields(formId: string) {
   );
 
   const createFieldMutation = trpc.formField.createFormField.useMutation({
-    onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
+    onSuccess: () => {
+      void utils.formField.listFormFields.invalidate({ formId });
+      void utils.form.getFormById.invalidate({ formId });
+    },
   });
   const updateFieldMutation = trpc.formField.updateFormField.useMutation({
-    onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
+    onSuccess: () => {
+      void utils.formField.listFormFields.invalidate({ formId });
+      void utils.form.getFormById.invalidate({ formId });
+    },
   });
   const deleteFieldMutation = trpc.formField.deleteFormField.useMutation({
-    onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
+    onSuccess: () => {
+      void utils.formField.listFormFields.invalidate({ formId });
+      void utils.form.getFormById.invalidate({ formId });
+    },
   });
   const reorderFieldMutation = trpc.formField.reorderFields.useMutation({
-    onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
+    onSuccess: () => {
+      void utils.formField.listFormFields.invalidate({ formId });
+      void utils.form.getFormById.invalidate({ formId });
+    },
   });
 
   return {

@@ -31,7 +31,9 @@ export const getFormByIdInput = z.object({
   formId: z.string().describe("The id of the form"),
 });
 
-export const getFormByIdOutput = formOutput;
+export const getFormByIdOutput = formOutput.extend({
+  hasUnpublishedChanges: z.boolean(),
+});
 
 export const getPublicFormByIdOutput = formOutput.extend({
   isOpen: z.boolean(),
@@ -59,8 +61,8 @@ export const updateFormSettingsInput = z.object({
   allowMultipleSubmissions: z.boolean(),
 });
 
-export const updateFormOutput = getFormByIdOutput;
-export const updateFormSettingsOutput = getFormByIdOutput;
+export const updateFormOutput = formOutput;
+export const updateFormSettingsOutput = formOutput;
 
 export const deleteFormInput = z.object({
   formId: z.string().describe("The id of the form"),
@@ -70,14 +72,14 @@ export const deleteFormOutput = z.object({
   id: z.string().describe("The id of the deleted form"),
 });
 
-export const listFormsByUserOutput = z.array(getFormByIdOutput);
+export const listFormsByUserOutput = z.array(formOutput);
 
 export const toggleFormOpenInput = z.object({
   formId: z.string().describe("The id of the form"),
   isOpen: z.boolean().describe("The new open status of the form"),
 });
 
-export const toggleFormOpenOutput = getFormByIdOutput;
+export const toggleFormOpenOutput = formOutput;
 
 export const updateFormResponseLimitInput = z.object({
   formId: z.string().describe("The id of the form"),
