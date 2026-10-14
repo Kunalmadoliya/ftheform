@@ -13,6 +13,11 @@ import { user } from "../auth-schema";
 import { relations } from "drizzle-orm";
 
 export const formStatus = pgEnum("status", ["filling", "submitted", "not_submitted"]);
+export const formAccessPolicy = pgEnum("form_access_policy", [
+  "anonymous_and_authenticated",
+  "anonymous_only",
+  "authenticated_only",
+]);
 export const formGenerationJobStatus = pgEnum("form_generation_job_status", [
   "pending",
   "running",
@@ -26,8 +31,7 @@ export const form = pgTable(
     id: uuid("form_id").primaryKey().defaultRandom(),
     title: text("title").notNull().default("Untitled Form"),
     userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "set null" }),
     description: text("description"),
     formUrl: text("form_url")
       .notNull()
@@ -38,6 +42,11 @@ export const form = pgTable(
     currentVersion: integer("current_version").notNull().default(1),
     isPublished: boolean("is_published").notNull().default(false),
     isOpen: boolean("is_open").notNull().default(true),
+    accessPolicy: formAccessPolicy("access_policy")
+      .notNull()
+      .default("anonymous_and_authenticated"),
+    allowMultipleSubmissions: boolean("allow_multiple_submissions").notNull().default(false),
+    isArchived: boolean("is_archived").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -52,7 +61,7 @@ export const formSnapshot = pgTable(
     id: uuid("form_snapshot_id").primaryKey().defaultRandom(),
     formId: uuid("form_id")
       .notNull()
-      .references(() => form.id, { onDelete: "cascade" }),
+      .references(() => form.id, { onDelete: "restrict" }),
     versions: integer("form_versions").notNull(),
     fieldsJson: jsonb("fields_json").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -112,15 +121,16 @@ export const submission = pgTable(
     id: uuid("submission_id").primaryKey().defaultRandom(),
     formId: uuid("form_id")
       .notNull()
-      .references(() => form.id, { onDelete: "cascade" }),
+      .references(() => form.id, { onDelete: "restrict" }),
     snapshotId: uuid("snapshot_id")
       .notNull()
-      .references(() => formSnapshot.id, { onDelete: "cascade" }),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+      .references(() => formSnapshot.id, { onDelete: "restrict" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    respondentId: text("respondent_id"),
 
     status: formStatus("status").notNull().default("filling"),
     draftAnswer: jsonb("draft_answer"),
-    allowMultipleSubmissions: boolean("allow_multiple_submit").default(false),
+    legacyAllowMultipleSubmissions: boolean("allow_multiple_submit").default(false),
     startedAt: timestamp("started_at").notNull().defaultNow(),
     lastActivity: timestamp("last_activity").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
@@ -131,6 +141,7 @@ export const submission = pgTable(
   (table) => [
     index("submission_formId_idx").on(table.formId),
     index("submission_userId_idx").on(table.userId),
+    index("submission_respondentId_idx").on(table.respondentId),
   ],
 );
 
@@ -141,9 +152,7 @@ export const answer = pgTable(
     submissionId: uuid("submission_id")
       .notNull()
       .references(() => submission.id, { onDelete: "cascade" }),
-    fieldId: uuid("field_id")
-      .notNull()
-      .references(() => formField.id, { onDelete: "cascade" }),
+    fieldId: uuid("field_id").references(() => formField.id, { onDelete: "set null" }),
     fieldKey: uuid("field_key_id").notNull(),
     value: jsonb("value"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

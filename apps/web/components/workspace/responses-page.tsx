@@ -47,15 +47,15 @@ export function ResponsesPage() {
     { enabled: Boolean(expanded), retry: false },
   );
 
-  function fieldLabel(fieldId: string) {
+  function fieldLabel(fieldId: string | null, fieldKey: string) {
     const fields = snapshotQuery.data?.fieldsJson;
-    if (!Array.isArray(fields)) return `Field ${fieldId}`;
+    if (!Array.isArray(fields)) return `Field ${fieldId ?? fieldKey}`;
     const field = fields.find(
       (item) =>
         item &&
         typeof item === "object" &&
-        "id" in item &&
-        item.id === fieldId &&
+        "fieldKey" in item &&
+        item.fieldKey === fieldKey &&
         "label" in item &&
         typeof item.label === "string",
     );
@@ -118,7 +118,7 @@ export function ResponsesPage() {
                     {answers.map((answer) => (
                       <div key={answer.id} className="space-y-1">
                         <dt className="text-xs font-medium text-muted-foreground">
-                          {fieldLabel(answer.fieldId)}
+                          {fieldLabel(answer.fieldId, answer.fieldKey)}
                         </dt>
                         <dd className="break-words text-sm">{displayValue(answer.value)}</dd>
                       </div>

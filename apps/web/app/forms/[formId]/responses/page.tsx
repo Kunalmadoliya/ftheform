@@ -58,21 +58,21 @@ export default function ResponsesPage() {
 
   if (isSessionPending || !session?.user) return null;
 
-  function getFieldLabel(fieldId: string) {
+  function getFieldLabel(fieldId: string | null, fieldKey: string) {
     const fields = snapshotQuery.data?.fieldsJson;
-    if (!Array.isArray(fields)) return `Field ${fieldId}`;
+    if (!Array.isArray(fields)) return `Field ${fieldId ?? fieldKey}`;
     const field = fields.find(
       (candidate) =>
         candidate &&
         typeof candidate === "object" &&
-        "id" in candidate &&
-        candidate.id === fieldId &&
+        "fieldKey" in candidate &&
+        candidate.fieldKey === fieldKey &&
         "label" in candidate &&
         typeof candidate.label === "string",
     );
     return field && typeof field === "object" && "label" in field && typeof field.label === "string"
       ? field.label
-      : `Field ${fieldId}`;
+      : `Field ${fieldId ?? fieldKey}`;
   }
 
   return (
@@ -132,7 +132,7 @@ export default function ResponsesPage() {
           <dl className="divide-y">
             {answers.map((answer) => (
               <div key={answer.id} className="grid gap-2 py-4 sm:grid-cols-[minmax(10rem,1fr)_2fr]">
-                <dt className="break-all text-sm font-medium">{getFieldLabel(answer.fieldId)}</dt>
+                <dt className="break-all text-sm font-medium">{getFieldLabel(answer.fieldId, answer.fieldKey)}</dt>
                 <dd className="whitespace-pre-wrap wrap-break-word text-sm text-muted-foreground">
                   {formatAnswer(answer.value)}
                 </dd>

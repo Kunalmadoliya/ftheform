@@ -7,7 +7,6 @@ export const submissionOutput = z.object({
   userId: z.string().nullable(),
   status: z.enum(["filling", "submitted", "not_submitted"]),
   draftAnswer: z.unknown().nullable(),
-  allowMultipleSubmissions: z.boolean().nullable(),
   startedAt: z.date(),
   lastActivity: z.date(),
   submittedAt: z.date().nullable(),
@@ -20,6 +19,14 @@ export const draftAnswerInput = z.object({ submissionId: z.string(), draftAnswer
 export const formSubmissionsInput = z.object({ formId: z.string() });
 export const versionMismatchInput = z.object({ formId: z.string(), submissionId: z.string() });
 export const submissionOutputSchema = submissionOutput;
+export const startSubmissionOutput = z.union([
+  submissionOutput,
+  z.object({
+    status: z.literal("already_submitted"),
+    formId: z.string(),
+    submittedAt: z.date().nullable(),
+  }),
+]);
 export const submissionsOutputSchema = z.array(submissionOutput);
 export const deleteSubmissionOutput = z.object({ id: z.string() });
 export const versionMismatchOutput = z.object({ id: z.string(), mismatch: z.boolean() });

@@ -28,6 +28,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
   const {
     renameFormAsync,
     updateFormDescriptionAsync,
+    updateSettingsAsync,
     toggleFormOpenAsync,
     updateResponseLimitAsync,
     publishFormAsync,
@@ -46,6 +47,10 @@ export function BuilderPage({ formId }: BuilderPageProps) {
   const [savedDescription, setSavedDescription] = useState("");
   const [isOpen, setIsOpen] = useState(true);
   const [responseLimit, setResponseLimit] = useState(50);
+  const [accessPolicy, setAccessPolicy] = useState<
+    "anonymous_and_authenticated" | "anonymous_only" | "authenticated_only"
+  >("anonymous_and_authenticated");
+  const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
@@ -63,6 +68,8 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     setSavedDescription(form.description ?? "");
     setIsOpen(form.isOpen);
     setResponseLimit(form.responseLimit);
+    setAccessPolicy(form.accessPolicy);
+    setAllowMultipleSubmissions(form.allowMultipleSubmissions);
     setPublishedUrl(form.isPublished ? form.formUrl : null);
   }, [form]);
 
@@ -124,6 +131,26 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       setResponseLimit(result.responseLimit);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update the response limit.");
+    }
+  }
+  async function handleSettingsChange(
+    nextAccessPolicy: typeof accessPolicy,
+    nextAllowMultipleSubmissions: boolean,
+  ) {
+    const previousAccessPolicy = accessPolicy;
+    const previousAllowMultipleSubmissions = allowMultipleSubmissions;
+    setAccessPolicy(nextAccessPolicy);
+    setAllowMultipleSubmissions(nextAllowMultipleSubmissions);
+    try {
+      await updateSettingsAsync({
+        formId,
+        accessPolicy: nextAccessPolicy,
+        allowMultipleSubmissions: nextAllowMultipleSubmissions,
+      });
+    } catch (error) {
+      setAccessPolicy(previousAccessPolicy);
+      setAllowMultipleSubmissions(previousAllowMultipleSubmissions);
+      toast.error(error instanceof Error ? error.message : "Unable to save form settings.");
     }
   }
   async function publishForm() {
@@ -231,9 +258,13 @@ export function BuilderPage({ formId }: BuilderPageProps) {
             isPublished={form.isPublished || Boolean(publishedUrl)}
             isOpen={isOpen}
             responseLimit={responseLimit}
+            accessPolicy={accessPolicy}
+            allowMultipleSubmissions={allowMultipleSubmissions}
             canEditResponseLimit={userRoleQuery.data?.userRole === "admin"}
             onOpenChange={(nextIsOpen) => void handleOpenChange(nextIsOpen)}
             onResponseLimitSave={(limit) => void handleResponseLimitSave(limit)}
+            onAccessPolicyChange={(policy) => void handleSettingsChange(policy, allowMultipleSubmissions)}
+            onMultipleSubmissionsChange={(allowed) => void handleSettingsChange(accessPolicy, allowed)}
           />
           <FieldInspector field={selectedField} onSave={saveField} onDelete={deleteSelectedField} />
         </aside>

@@ -1,4 +1,4 @@
-import { and, db, desc, eq, sql } from "@repo/database";
+import { and, db, desc, eq, isNotNull, sql } from "@repo/database";
 import {
   createInitialForm,
   deleteForm,
@@ -14,6 +14,8 @@ import {
   type RenameFormType,
   updateFormDescription,
   type UpdateFormDescriptionType,
+  updateFormSettings,
+  type UpdateFormSettingsType,
   toggleFormOpen,
   type ToggleFormOpenStatusType,
   type UpdateFormResponseLimitType,
@@ -28,6 +30,7 @@ import {
 import { form } from "@repo/database/models/form-schema";
 import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
+import { assertFormAccess } from "./access";
 
 const formSnapshotService = new FormSnapshotService();
 
@@ -41,6 +44,9 @@ export default class FormService {
       isPublished: form.isPublished,
       isOpen: form.isOpen,
       responseLimit: form.responseLimit,
+      accessPolicy: form.accessPolicy,
+      allowMultipleSubmissions: form.allowMultipleSubmissions,
+      isArchived: form.isArchived,
       views: form.views,
       createdAt: form.createdAt,
       updatedAt: form.updatedAt,
@@ -81,14 +87,20 @@ export default class FormService {
     return foundForm;
   }
 
-  public async getPublicFormById(input: GetPublicFormByIdType) {
+  public async getPublicFormById(input: GetPublicFormByIdType, userId?: string | null) {
     const { formId } = await getPublicFormById.parseAsync(input);
     const [foundForm] = await db
-      .select({ ...this.formSelection(), isOpen: form.isOpen })
+      .select(this.formSelection())
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.isPublished, true)));
+      .where(and(
+        eq(form.id, formId),
+        eq(form.isPublished, true),
+        eq(form.isArchived, false),
+        isNotNull(form.userId),
+      ));
 
     if (!foundForm) throw new Error("Form not found");
+    assertFormAccess(foundForm.accessPolicy, userId);
     return foundForm;
   }
 
@@ -98,7 +110,7 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ title })
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning(this.formSelection());
 
     if (!updatedForm) {
@@ -114,7 +126,7 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ description })
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning(this.formSelection());
 
     if (!updatedForm) {
@@ -124,12 +136,27 @@ export default class FormService {
     return updatedForm;
   }
 
+  public async updateSettings(input: UpdateFormSettingsType) {
+    const { formId, accessPolicy, allowMultipleSubmissions, userId } =
+      await updateFormSettings.parseAsync(input);
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ accessPolicy, allowMultipleSubmissions })
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
+      .returning(this.formSelection());
+
+    if (!updatedForm) throw new Error("Form not found");
+    return updatedForm;
+  }
+
   public async deleteForm(input: DeleteFormType) {
     const { formId, userId } = await deleteForm.parseAsync(input);
 
     const [deletedForm] = await db
-      .delete(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .update(form)
+      .set({ isArchived: true, isPublished: false, isOpen: false })
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning({ id: form.id });
 
     if (!deletedForm) {
@@ -155,7 +182,7 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ isOpen })
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning(this.formSelection());
 
     if (!updatedForm) {
@@ -178,7 +205,7 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ responseLimit })
-      .where(eq(form.id, formId))
+      .where(and(eq(form.id, formId), eq(form.isArchived, false)))
       .returning({ id: form.id, responseLimit: form.responseLimit });
 
     if (!updatedForm) {
@@ -197,7 +224,12 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ views: sql`${form.views} + 1` })
-      .where(and(eq(form.id, formId), eq(form.isPublished, true)))
+      .where(and(
+        eq(form.id, formId),
+        eq(form.isPublished, true),
+        eq(form.isArchived, false),
+        isNotNull(form.userId),
+      ))
       .returning({ id: form.id, views: form.views });
 
     if (!updatedForm) {
@@ -212,13 +244,14 @@ export default class FormService {
 
     return db.transaction(async (tx) => {
       const [currentForm] = await tx
-        .select({ title: form.title })
+        .select({ title: form.title, isArchived: form.isArchived })
         .from(form)
         .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
       if (!currentForm) {
         throw new Error("Form not found");
       }
+      if (currentForm.isArchived) throw new Error("Archived forms cannot be published");
 
       const slug = currentForm.title.trim().replace(/\s+/g, "-").toLowerCase();
       const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
@@ -229,7 +262,7 @@ export default class FormService {
           isPublished: true,
           currentVersion: sql<number>`${form.currentVersion} + 1`,
         })
-        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
         .returning({ ...this.formSelection(), currentVersion: form.currentVersion });
 
       if (!updatedForm) {
@@ -255,13 +288,14 @@ export default class FormService {
     // check the form's ACTUAL current state in the DB, never trust
     // an isPublished value coming from client input for this decision
     const [existingForm] = await db
-      .select({ isPublished: form.isPublished })
+      .select({ isPublished: form.isPublished, isArchived: form.isArchived })
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
     if (!existingForm) {
       throw new Error("Form not found");
     }
+    if (existingForm.isArchived) throw new Error("Archived forms cannot be changed");
 
     if (!existingForm.isPublished) {
       throw new Error("Form is already unpublished");
@@ -270,7 +304,7 @@ export default class FormService {
     const [updatedForm] = await db
       .update(form)
       .set({ isPublished: false })
-      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning(this.formSelection());
 
     if (!updatedForm) {

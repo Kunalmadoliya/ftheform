@@ -1,4 +1,4 @@
-import { and, db, eq } from "@repo/database";
+import { and, db, eq, isNull } from "@repo/database";
 import { answer, form, formField, formSnapshot, submission } from "@repo/database/models/form-schema";
 import {
   getAnswersByFieldInputSchema,
@@ -13,14 +13,17 @@ import {
   type saveFormAnswerInputType,
 } from "./model";
 import { z } from "zod";
+import { assertFormAccess } from "../form/access";
 
 export default class AnswerService {
   public async saveAnswer(input: SaveAnswerInputType) {
-    const { submissionId, fieldId, value, userId } = await saveAnswerInputSchema.parseAsync(input);
+    const { submissionId, fieldId, value, userId, respondentId } =
+      await saveAnswerInputSchema.parseAsync(input);
     const [savedAnswer] = await this.saveBulkAnswers({
       submissionId,
       answers: { [fieldId]: value },
       userId,
+      respondentId,
     });
     if (!savedAnswer) throw new Error("Failed to save answer");
     return savedAnswer;
@@ -31,21 +34,34 @@ export default class AnswerService {
   }
 
   public async saveBulkAnswers(input: SaveBulkAnswersInputType) {
-    const { submissionId, answers } = await saveBulkAnswersInputSchema.parseAsync(input);
+    const { submissionId, answers, respondentId } = await saveBulkAnswersInputSchema.parseAsync(input);
     const userId = input.userId;
+    const identityCondition = userId
+      ? eq(submission.userId, userId)
+      : respondentId
+        ? and(isNull(submission.userId), eq(submission.respondentId, respondentId))
+        : undefined;
+    if (!identityCondition) throw new Error("A valid respondent identity is required");
 
     return db.transaction(async (tx) => {
-      const [submissionRecord] = await tx
-        .select()
+      const [submissionResult] = await tx
+        .select({
+          submissionRecord: submission,
+          accessPolicy: form.accessPolicy,
+          isArchived: form.isArchived,
+          ownerId: form.userId,
+        })
         .from(submission)
-        .where(eq(submission.id, submissionId))
-        .limit(1);
-      if (
-        !submissionRecord ||
-        (userId !== undefined && submissionRecord.userId !== (userId ?? null))
-      ) {
-        throw new Error("Submission not found");
+        .innerJoin(form, eq(submission.formId, form.id))
+        .where(and(eq(submission.id, submissionId), identityCondition))
+        .limit(1)
+        .for("update");
+      if (!submissionResult) throw new Error("Submission not found");
+      const { submissionRecord } = submissionResult;
+      if (submissionResult.isArchived || !submissionResult.ownerId) {
+        throw new Error("Form is archived");
       }
+      assertFormAccess(submissionResult.accessPolicy, userId);
       if (submissionRecord.status !== "filling") {
         throw new Error("Submission is already finalized");
       }
@@ -71,16 +87,29 @@ export default class AnswerService {
       for (const [fieldId, value] of Object.entries(answers)) {
         const field = fieldsById.get(fieldId);
         if (!field) throw new Error("Form field not found in submission snapshot");
+        const [currentField] = await tx
+          .select({ id: formField.id })
+          .from(formField)
+          .where(
+            and(
+              eq(formField.id, fieldId),
+              eq(formField.formId, submissionRecord.formId),
+              eq(formField.fieldKey, field.fieldKey),
+            ),
+          )
+          .limit(1)
+          .for("key share");
+        const answerFieldId = currentField?.id ?? null;
         const [existingAnswer] = await tx
           .select()
           .from(answer)
-          .where(and(eq(answer.submissionId, submissionId), eq(answer.fieldId, fieldId)))
+          .where(and(eq(answer.submissionId, submissionId), eq(answer.fieldKey, field.fieldKey)))
           .limit(1);
 
         if (existingAnswer) {
           const [updatedAnswer] = await tx
             .update(answer)
-            .set({ value, fieldKey: field.fieldKey })
+            .set({ fieldId: answerFieldId, value })
             .where(eq(answer.id, existingAnswer.id))
             .returning();
           if (!updatedAnswer) throw new Error("Failed to update answer");
@@ -88,7 +117,7 @@ export default class AnswerService {
         } else {
           const [newAnswer] = await tx
             .insert(answer)
-            .values({ submissionId, fieldId, fieldKey: field.fieldKey, value })
+            .values({ submissionId, fieldId: answerFieldId, fieldKey: field.fieldKey, value })
             .returning();
           if (!newAnswer) throw new Error("Failed to save answer");
           savedAnswers.push(newAnswer);

@@ -14,6 +14,8 @@ import {
   publishFormOutput,
   renameFormInput,
   updateFormDescriptionInput,
+  updateFormSettingsInput,
+  updateFormSettingsOutput,
   updateFormOutput,
   unpublishFormInput,
   unpublishFormOutput,
@@ -85,7 +87,7 @@ export const formRouter = {
     })
     .input(getFormByIdInput)
     .output(getPublicFormByIdOutput)
-    .query(({ input }) => formServiceInstance.getPublicFormById(input)),
+    .query(({ ctx, input }) => formServiceInstance.getPublicFormById(input, ctx.userId)),
 
   renameForm: protectedProcedure
     .meta({
@@ -118,6 +120,24 @@ export const formRouter = {
     .output(updateFormOutput)
     .mutation(async ({ ctx, input }) =>
       formServiceInstance.updateFormDescription({
+        ...input,
+        userId: ctx.userId,
+      }),
+    ),
+
+  updateSettings: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: formsPath("/:formId/settings"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(updateFormSettingsInput)
+    .output(updateFormSettingsOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.updateSettings({
         ...input,
         userId: ctx.userId,
       }),

@@ -3,7 +3,7 @@ import { z } from "zod";
 export const answerOutput = z.object({
   id: z.string(),
   submissionId: z.string(),
-  fieldId: z.string(),
+  fieldId: z.string().nullable(),
   fieldKey: z.string(),
   value: z.unknown().nullable(),
   createdAt: z.date(),

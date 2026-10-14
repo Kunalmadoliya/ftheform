@@ -1,6 +1,8 @@
 import { form, formSnapshot, submission } from "@repo/database/schema";
-import { and, count, db, desc, eq } from "@repo/database";
+import { and, count, db, desc, eq, isNull, sql } from "@repo/database";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { assertFormAccess } from "../form/access";
 import {
   validateSubmittedFormVersion,
   type validateSubmittedFormVersionType,
@@ -27,6 +29,23 @@ import {
 } from "./model";
 
 export default class SubmissionService {
+  private respondentCondition(userId: string | null | undefined, respondentId: string | null | undefined) {
+    if (userId) return eq(submission.userId, userId);
+    if (respondentId) {
+      return and(isNull(submission.userId), eq(submission.respondentId, respondentId));
+    }
+    throw new Error("A valid respondent identity is required");
+  }
+
+  private async lockSubmissionIdentities(
+    tx: Pick<typeof db, "execute">,
+    keys: string[],
+  ) {
+    for (const key of [...new Set(keys)].sort()) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+    }
+  }
+
   private validateDraftAgainstSnapshot(fieldsJson: unknown, draftAnswer: unknown) {
     const parsedFields = z
       .array(z.object({ id: z.string(), required: z.boolean(), type: z.string() }))
@@ -52,23 +71,30 @@ export default class SubmissionService {
   }
 
   private async validateFormVersion(input: validateSubmittedFormVersionType) {
-    const { formId } = await validateSubmittedFormVersion.parseAsync(input);
+    const { formId, userId } = await validateSubmittedFormVersion.parseAsync(input);
 
     const [validatedForm] = await db
       .select({
         currentVersion: form.currentVersion,
+        ownerId: form.userId,
         isPublished: form.isPublished,
         isOpen: form.isOpen,
+        isArchived: form.isArchived,
         responseLimit: form.responseLimit,
+        accessPolicy: form.accessPolicy,
+        allowMultipleSubmissions: form.allowMultipleSubmissions,
       })
       .from(form)
-      .where(eq(form.id, formId));
+      .where(eq(form.id, formId))
+      .for("share");
 
     if (!validatedForm) {
       throw new Error("Form not found");
     }
+    if (validatedForm.isArchived || !validatedForm.ownerId) throw new Error("Form is archived");
     if (!validatedForm.isPublished) throw new Error("Form is not published");
     if (!validatedForm.isOpen) throw new Error("Form is closed");
+    assertFormAccess(validatedForm.accessPolicy, userId);
 
     const [matchingSnapshot] = await db
       .select()
@@ -88,45 +114,149 @@ export default class SubmissionService {
   }
 
   public async startSubmissionForm(input: startSubmissionFormSchemaType) {
-    const { formId, submissionId, userId } = await startSubmissionFormSchema.parseAsync(input);
+    const { formId, userId, respondentId: cookieRespondentId } =
+      await startSubmissionFormSchema.parseAsync(input);
+    const { form: formSettings } = await this.validateFormVersion({ formId, userId });
 
-    const { form, snapshot } = await this.validateFormVersion({ formId });
+    const respondentId =
+      !userId && formSettings.accessPolicy !== "authenticated_only"
+        ? cookieRespondentId ?? randomUUID()
+        : cookieRespondentId ?? null;
+    const identityKeys = userId
+      ? [
+          `submission:${formId}:user:${userId}`,
+          ...(respondentId ? [`submission:${formId}:respondent:${respondentId}`] : []),
+        ]
+      : [`submission:${formId}:respondent:${respondentId}`];
 
-    if (submissionId) {
-      const [existing] = await db
+    const result = await db.transaction(async (tx) => {
+      await this.lockSubmissionIdentities(tx, identityKeys);
+
+      const [currentForm] = await tx
+        .select({
+          currentVersion: form.currentVersion,
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isOpen: form.isOpen,
+          isArchived: form.isArchived,
+          responseLimit: form.responseLimit,
+          accessPolicy: form.accessPolicy,
+          allowMultipleSubmissions: form.allowMultipleSubmissions,
+        })
+        .from(form)
+        .where(eq(form.id, formId))
+        .for("share");
+      if (!currentForm) throw new Error("Form not found");
+      if (currentForm.isArchived || !currentForm.ownerId) throw new Error("Form is archived");
+      if (!currentForm.isPublished) throw new Error("Form is not published");
+      if (!currentForm.isOpen) throw new Error("Form is closed");
+      assertFormAccess(currentForm.accessPolicy, userId);
+
+      const [snapshot] = await tx
+        .select()
+        .from(formSnapshot)
+        .where(and(eq(formSnapshot.formId, formId), eq(formSnapshot.versions, currentForm.currentVersion)))
+        .orderBy(desc(formSnapshot.createdAt))
+        .limit(1);
+      if (!snapshot) throw new Error("Form snapshot not found");
+
+      const identities = userId
+        ? [
+            { userId, respondentId: null },
+            ...(respondentId ? [{ userId: null, respondentId }] : []),
+          ]
+        : [{ userId: null, respondentId }];
+
+      if (!currentForm.allowMultipleSubmissions) {
+        for (const identity of identities) {
+          const [previouslySubmitted] = await tx
+            .select({ submittedAt: submission.submittedAt })
+            .from(submission)
+            .where(
+              and(
+                eq(submission.formId, formId),
+                eq(submission.status, "submitted"),
+                identity.userId
+                  ? eq(submission.userId, identity.userId)
+                  : and(isNull(submission.userId), eq(submission.respondentId, identity.respondentId!)),
+              ),
+            )
+            .orderBy(desc(submission.submittedAt))
+            .limit(1);
+          if (previouslySubmitted) {
+            return {
+              outcome: "already_submitted" as const,
+              formId,
+              submittedAt: previouslySubmitted.submittedAt,
+            };
+          }
+        }
+      }
+
+      const activeIdentity = userId
+        ? eq(submission.userId, userId)
+        : and(isNull(submission.userId), eq(submission.respondentId, respondentId!));
+      const [activeSubmission] = await tx
         .select()
         .from(submission)
-        .where(and(eq(submission.id, submissionId), eq(submission.formId, formId)));
-      if (!existing) throw new Error("Submission not found");
-      if (existing.userId !== (userId ?? null)) throw new Error("Submission not found");
-      return existing;
-    }
+        .where(and(eq(submission.formId, formId), eq(submission.status, "filling"), activeIdentity))
+        .orderBy(desc(submission.lastActivity))
+        .limit(1);
+      if (activeSubmission) return { outcome: "started" as const, submission: activeSubmission };
 
-    const [submittedResult] = await db
-      .select({ submittedCount: count() })
-      .from(submission)
-      .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")));
-    if (!submittedResult) throw new Error("Unable to check the form response limit");
-    if (submittedResult.submittedCount >= form.responseLimit) {
-      throw new Error("This form has reached its response limit");
-    }
+      if (userId && respondentId && currentForm.accessPolicy !== "anonymous_only") {
+        const [anonymousDraft] = await tx
+          .select()
+          .from(submission)
+          .where(
+            and(
+              eq(submission.formId, formId),
+              eq(submission.status, "filling"),
+              isNull(submission.userId),
+              eq(submission.respondentId, respondentId),
+            ),
+          )
+          .orderBy(desc(submission.lastActivity))
+          .limit(1);
+        if (anonymousDraft) {
+          const [adoptedDraft] = await tx
+            .update(submission)
+            .set({ userId, respondentId: null, lastActivity: new Date() })
+            .where(and(eq(submission.id, anonymousDraft.id), eq(submission.status, "filling")))
+            .returning();
+          if (!adoptedDraft) throw new Error("Unable to resume the anonymous response");
+          return { outcome: "started" as const, submission: adoptedDraft };
+        }
+      }
 
-    const [newSubmission] = await db
-      .insert(submission)
-      .values({
-        formId,
-        snapshotId: snapshot.id,
-        userId: userId ?? null,
-        status: "filling",
-        submittedAt: null,
-      })
-      .returning();
+      const [submittedResult] = await tx
+        .select({ submittedCount: count() })
+        .from(submission)
+        .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")));
+      if (!submittedResult) throw new Error("Unable to check the form response limit");
+      if (submittedResult.submittedCount >= currentForm.responseLimit) {
+        throw new Error("This form has reached its response limit");
+      }
 
-    if (!newSubmission) {
-      throw new Error("Failed to start submission");
-    }
+      const [newSubmission] = await tx
+        .insert(submission)
+        .values({
+          formId,
+          snapshotId: snapshot.id,
+          userId: userId ?? null,
+          respondentId: userId ? null : respondentId,
+          status: "filling",
+          submittedAt: null,
+        })
+        .returning();
+      if (!newSubmission) throw new Error("Failed to start submission");
+      return { outcome: "started" as const, submission: newSubmission };
+    });
 
-    return newSubmission;
+    return {
+      ...result,
+      respondentIdToSet: !userId && !cookieRespondentId ? respondentId : null,
+    };
   }
 
   public async startSubmission(input: startSubmissionFormSchemaType) {
@@ -134,13 +264,22 @@ export default class SubmissionService {
   }
 
   public async getActiveSubmission(input: activeSubmissionSchemaType) {
-    const { formId, submissionId, userId } = await activeSubmissionSchema.parseAsync(input);
-    if (submissionId) return this.getSubmissionById({ submissionId, formId, userId });
-    if (!userId) throw new Error("Submission id is required for anonymous submissions");
+    const { formId, submissionId, userId, respondentId } = await activeSubmissionSchema.parseAsync(input);
+    if (submissionId) return this.getSubmissionById({ submissionId, formId, userId, respondentId });
+    const [formAccess] = await db
+      .select({ accessPolicy: form.accessPolicy })
+      .from(form)
+      .where(eq(form.id, formId));
+    if (!formAccess) throw new Error("Form not found");
+    assertFormAccess(formAccess.accessPolicy, userId);
     const [activeSubmission] = await db
       .select()
       .from(submission)
-      .where(and(eq(submission.formId, formId), eq(submission.userId, userId), eq(submission.status, "filling")))
+      .where(and(
+        eq(submission.formId, formId),
+        eq(submission.status, "filling"),
+        this.respondentCondition(userId, respondentId),
+      ))
       .orderBy(desc(submission.lastActivity));
 
     if (!activeSubmission) {
@@ -151,24 +290,30 @@ export default class SubmissionService {
   }
 
   public async getSubmissionById(input: submissionLookupSchemaType) {
-    const { submissionId, formId, userId } = await submissionLookupSchema.parseAsync(input);
-    const [submissionRecord] = await db
-      .select()
+    const { submissionId, formId, userId, respondentId } = await submissionLookupSchema.parseAsync(input);
+    const [submissionResult] = await db
+      .select({
+        submissionRecord: submission,
+        accessPolicy: form.accessPolicy,
+      })
       .from(submission)
-      .where(and(eq(submission.id, submissionId), formId ? eq(submission.formId, formId) : undefined));
-
-    if (
-      !submissionRecord ||
-      (userId !== undefined && submissionRecord.userId !== (userId ?? null))
-    ) {
+      .innerJoin(form, eq(submission.formId, form.id))
+      .where(and(
+          eq(submission.id, submissionId),
+          formId ? eq(submission.formId, formId) : undefined,
+          this.respondentCondition(userId, respondentId),
+        ));
+    if (!submissionResult) {
       throw new Error("Submission not found");
     }
+    assertFormAccess(submissionResult.accessPolicy, userId);
+    const submissionRecord = submissionResult.submissionRecord;
     return submissionRecord;
   }
 
   public async updateDraftAnswer(input: updateDraftAnswerSchemaType) {
-    const { submissionId, draftAnswer, userId } = await updateDraftAnswerSchema.parseAsync(input);
-    const existing = await this.getSubmissionById({ submissionId, userId });
+    const { submissionId, draftAnswer, userId, respondentId } = await updateDraftAnswerSchema.parseAsync(input);
+    const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
     if (existing.status !== "filling") throw new Error("Submission is already finalized");
 
     const currentDraft = existing.draftAnswer && typeof existing.draftAnswer === "object" && !Array.isArray(existing.draftAnswer)
@@ -177,58 +322,145 @@ export default class SubmissionService {
     const [updatedSubmission] = await db
       .update(submission)
       .set({ draftAnswer: { ...currentDraft, ...draftAnswer }, lastActivity: new Date() })
-      .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
+      .where(and(
+        eq(submission.id, submissionId),
+        eq(submission.status, "filling"),
+        this.respondentCondition(userId, respondentId),
+      ))
       .returning();
     if (!updatedSubmission) throw new Error("Submission not found");
     return updatedSubmission;
   }
 
   public async updateLastActivity(input: updateLastActivitySchemaType) {
-    const { submissionId, userId } = await updateLastActivitySchema.parseAsync(input);
-    const existing = await this.getSubmissionById({ submissionId, userId });
+    const { submissionId, userId, respondentId } = await updateLastActivitySchema.parseAsync(input);
+    const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
     if (existing.status !== "filling") throw new Error("Submission is already finalized");
     const [updatedSubmission] = await db
       .update(submission)
       .set({ lastActivity: new Date() })
-      .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
+      .where(and(
+        eq(submission.id, submissionId),
+        eq(submission.status, "filling"),
+        this.respondentCondition(userId, respondentId),
+      ))
       .returning();
     if (!updatedSubmission) throw new Error("Submission not found");
     return updatedSubmission;
   }
 
   public async submitForm(input: submitFormSchemaType) {
-    const { submissionId, userId } = await submitFormSchema.parseAsync(input);
-    const existing = await this.getSubmissionById({ submissionId, userId });
-    if (existing.status !== "filling") throw new Error("Submission is already finalized");
+    const { submissionId, userId, respondentId } = await submitFormSchema.parseAsync(input);
+    const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
+    const identities = userId
+      ? [
+          `submission:${existing.formId}:user:${userId}`,
+          ...(respondentId ? [`submission:${existing.formId}:respondent:${respondentId}`] : []),
+        ]
+      : [`submission:${existing.formId}:respondent:${respondentId}`];
 
-    const { form, snapshot } = await this.validateFormVersion({ formId: existing.formId });
-    if (existing.snapshotId !== snapshot.id) throw new Error("Submission version is out of date");
-    this.validateDraftAgainstSnapshot(snapshot.fieldsJson, existing.draftAnswer);
+    return db.transaction(async (tx) => {
+      await this.lockSubmissionIdentities(tx, [
+        ...identities,
+        `submission-form-limit:${existing.formId}`,
+      ]);
+      const [currentSubmission] = await tx
+        .select()
+        .from(submission)
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.formId, existing.formId),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .for("update");
+      if (!currentSubmission) throw new Error("Submission not found");
+      if (currentSubmission.status === "submitted") return currentSubmission;
+      if (currentSubmission.status !== "filling") throw new Error("Submission is already finalized");
 
-    const [submittedResult] = await db
-      .select({ submittedCount: count() })
-      .from(submission)
-      .where(and(eq(submission.formId, existing.formId), eq(submission.status, "submitted")));
-    if (!submittedResult) throw new Error("Unable to check the form response limit");
-    if (submittedResult.submittedCount >= form.responseLimit) {
-      throw new Error("This form has reached its response limit");
-    }
+      const [formSettings] = await tx
+        .select({
+          currentVersion: form.currentVersion,
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isOpen: form.isOpen,
+          isArchived: form.isArchived,
+          responseLimit: form.responseLimit,
+          accessPolicy: form.accessPolicy,
+          allowMultipleSubmissions: form.allowMultipleSubmissions,
+        })
+        .from(form)
+        .where(eq(form.id, existing.formId))
+        .for("share");
+      if (!formSettings) throw new Error("Form not found");
+      if (formSettings.isArchived || !formSettings.ownerId) throw new Error("Form is archived");
+      if (!formSettings.isPublished) throw new Error("Form is not published");
+      if (!formSettings.isOpen) throw new Error("Form is closed");
+      assertFormAccess(formSettings.accessPolicy, userId);
 
-    const [updatedSubmission] = await db
-      .update(submission)
-      .set({
-        status: "submitted",
-        submittedAt: new Date(),
-        lastActivity: new Date(),
-      })
-      .where(and(eq(submission.id, submissionId), eq(submission.status, "filling"), eq(submission.formId, existing.formId)))
-      .returning();
+      const [snapshot] = await tx
+        .select()
+        .from(formSnapshot)
+        .where(and(
+          eq(formSnapshot.formId, existing.formId),
+          eq(formSnapshot.versions, formSettings.currentVersion),
+        ))
+        .orderBy(desc(formSnapshot.createdAt))
+        .limit(1);
+      if (!snapshot) throw new Error("Form snapshot not found");
+      if (currentSubmission.snapshotId !== snapshot.id) {
+        throw new Error("Submission version is out of date");
+      }
+      this.validateDraftAgainstSnapshot(snapshot.fieldsJson, currentSubmission.draftAnswer);
 
-    if (!updatedSubmission) {
-      throw new Error("Failed to submit form");
-    }
+      if (!formSettings.allowMultipleSubmissions) {
+        const identityFilters = userId
+          ? [
+              eq(submission.userId, userId),
+              ...(respondentId
+                ? [and(isNull(submission.userId), eq(submission.respondentId, respondentId))]
+                : []),
+            ]
+          : [and(isNull(submission.userId), eq(submission.respondentId, respondentId!))];
+        for (const identityFilter of identityFilters) {
+          const [priorSubmission] = await tx
+            .select()
+            .from(submission)
+            .where(and(
+              eq(submission.formId, existing.formId),
+              eq(submission.status, "submitted"),
+              identityFilter,
+            ))
+            .limit(1);
+          if (priorSubmission) return priorSubmission;
+        }
+      }
 
-    return updatedSubmission;
+      const [submittedResult] = await tx
+        .select({ submittedCount: count() })
+        .from(submission)
+        .where(and(eq(submission.formId, existing.formId), eq(submission.status, "submitted")));
+      if (!submittedResult) throw new Error("Unable to check the form response limit");
+      if (submittedResult.submittedCount >= formSettings.responseLimit) {
+        throw new Error("This form has reached its response limit");
+      }
+
+      const [updatedSubmission] = await tx
+        .update(submission)
+        .set({
+          status: "submitted",
+          submittedAt: new Date(),
+          lastActivity: new Date(),
+        })
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.status, "filling"),
+          eq(submission.formId, existing.formId),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .returning();
+      if (!updatedSubmission) throw new Error("Failed to submit form");
+      return updatedSubmission;
+    });
   }
 
   public async listSubmissionsByForm(input: listSubmissionsByFormSchemaType) {
@@ -248,22 +480,27 @@ export default class SubmissionService {
   }
 
   public async checkVersionMismatch(input: validateSubmittedFormVersionType) {
-    const { formId, submissionId } = await validateSubmittedFormVersion.parseAsync(input);
-    const { snapshot } = await this.validateFormVersion({ formId });
+    const { formId, submissionId, userId, respondentId } =
+      await validateSubmittedFormVersion.parseAsync(input);
+    const { snapshot } = await this.validateFormVersion({ formId, userId, respondentId });
     if (!submissionId) return false;
-    const current = await this.getSubmissionById({ submissionId, formId });
+    const current = await this.getSubmissionById({ submissionId, formId, userId, respondentId });
     return current.snapshotId !== snapshot.id;
   }
 
   public async markNotSubmitted(input: markNotSubmittedSchemaType) {
-    const { submissionId, userId } = await markNotSubmittedSchema.parseAsync(input);
-    const existing = await this.getSubmissionById({ submissionId, userId });
+    const { submissionId, userId, respondentId } = await markNotSubmittedSchema.parseAsync(input);
+    const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
     if (existing.status !== "filling") return existing;
 
     const [updatedSubmission] = await db
       .update(submission)
       .set({ status: "not_submitted", lastActivity: new Date() })
-      .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
+      .where(and(
+        eq(submission.id, submissionId),
+        eq(submission.status, "filling"),
+        this.respondentCondition(userId, respondentId),
+      ))
       .returning();
     if (!updatedSubmission) throw new Error("Failed to mark submission as not submitted");
     return updatedSubmission;

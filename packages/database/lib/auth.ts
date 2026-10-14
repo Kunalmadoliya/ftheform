@@ -8,7 +8,7 @@ import { db } from "../index";
 
 export const auth = betterAuth({
   baseURL: env.BASE_URL  , // 👈 add this — must be your API server's URL, e.g. http://localhost:4000
-  trustedOrigins: ["http://localhost:3000"],
+  trustedOrigins: [env.WEB_URL],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

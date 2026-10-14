@@ -8,6 +8,13 @@ const formOutput = z.object({
   isPublished: z.boolean(),
   isOpen: z.boolean(),
   responseLimit: z.number(),
+  accessPolicy: z.enum([
+    "anonymous_and_authenticated",
+    "anonymous_only",
+    "authenticated_only",
+  ]),
+  allowMultipleSubmissions: z.boolean(),
+  isArchived: z.boolean(),
   views: z.number(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -40,7 +47,18 @@ export const updateFormDescriptionInput = z.object({
   description: z.string().nullable().describe("The new description of the form"),
 });
 
+export const updateFormSettingsInput = z.object({
+  formId: z.string().uuid(),
+  accessPolicy: z.enum([
+    "anonymous_and_authenticated",
+    "anonymous_only",
+    "authenticated_only",
+  ]),
+  allowMultipleSubmissions: z.boolean(),
+});
+
 export const updateFormOutput = getFormByIdOutput;
+export const updateFormSettingsOutput = getFormByIdOutput;
 
 export const deleteFormInput = z.object({
   formId: z.string().describe("The id of the form"),

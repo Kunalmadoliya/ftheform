@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -47,6 +48,7 @@ export default function PublicFormPage() {
   const [submissionId, setSubmissionId] = useState<string>();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [interactionError, setInteractionError] = useState("");
   const autosaveTimer = useRef<number | undefined>(undefined);
   const {
@@ -77,24 +79,26 @@ export default function PublicFormPage() {
 
   useEffect(() => {
     if (!formId || !form || submissionId) return;
-    const storageKey = `form-submission:${formId}`;
-    const storedId = window.localStorage.getItem(storageKey) ?? undefined;
-    void startSubmissionAsync({ formId, submissionId: storedId })
-      .catch(async () => {
-        if (!storedId) throw new Error("Unable to start this response.");
-        window.localStorage.removeItem(storageKey);
-        return startSubmissionAsync({ formId });
-      })
-      .then((submission) => {
-        setSubmissionId(submission.id);
-        if (submission.status === "submitted") {
+    const startOrResume = () => startSubmissionAsync({ formId });
+    const startRequest = async () => (
+      navigator.locks
+        ? await navigator.locks.request(`ftheform:submission:${formId}`, startOrResume)
+        : await startOrResume()
+    );
+    void startRequest()
+      .then((result) => {
+        if (result.status === "already_submitted") {
+          setAlreadySubmitted(true);
           setSubmitted(true);
-          window.localStorage.removeItem(storageKey);
           return;
         }
-        window.localStorage.setItem(storageKey, submission.id);
-        if (submission.draftAnswer && typeof submission.draftAnswer === "object" && !Array.isArray(submission.draftAnswer)) {
-          setAnswers(submission.draftAnswer as Record<string, unknown>);
+        setSubmissionId(result.id);
+        if (result.status === "submitted") {
+          setSubmitted(true);
+          return;
+        }
+        if (result.draftAnswer && typeof result.draftAnswer === "object" && !Array.isArray(result.draftAnswer)) {
+          setAnswers(result.draftAnswer as Record<string, unknown>);
         }
         setInteractionError("");
       })
@@ -124,7 +128,6 @@ export default function PublicFormPage() {
 
   function restartAfterVersionChange() {
     if (!window.confirm("This form changed. Discard your saved draft and start a new response?")) return;
-    window.localStorage.removeItem(`form-submission:${formId}`);
     setSubmissionId(undefined);
     setAnswers({});
     setInteractionError("");
@@ -154,18 +157,49 @@ export default function PublicFormPage() {
       await saveBulkAnswersAsync({ submissionId, answers });
       await submitFormAsync({ submissionId });
       setSubmitted(true);
-      window.localStorage.removeItem(`form-submission:${formId}`);
     } catch (error) {
       setInteractionError(error instanceof Error ? error.message : "Unable to submit this response.");
     }
   }
 
   if (!formId) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
-  if (formQuery.isPending || snapshotQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
+  if (formQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
+  if (formQuery.error?.message.includes("Authentication required")) {
+    const returnTo = `/form/${encodeURIComponent(formUrl)}`;
+    return (
+      <main className="mx-auto max-w-2xl p-8">
+        <h1 className="text-xl font-semibold">Sign in to respond</h1>
+        <p className="mt-2 text-muted-foreground">This form requires an authenticated account.</p>
+        <Link className="mt-4 inline-block underline" href={`/login?next=${encodeURIComponent(returnTo)}`}>
+          Continue to sign in
+        </Link>
+      </main>
+    );
+  }
+  if (formQuery.error?.message.includes("only accepts anonymous responses")) {
+    return (
+      <main className="mx-auto max-w-2xl p-8">
+        <h1 className="text-xl font-semibold">Anonymous responses only</h1>
+        <p className="mt-2 text-muted-foreground">Sign out of your account to respond to this form.</p>
+      </main>
+    );
+  }
   if (formQuery.isError || !form) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
   if (!form.isOpen) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">This form is closed</h1></main>;
+  if (snapshotQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
   if (snapshotQuery.isError || !snapshot) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">This form is unavailable</h1></main>;
-  if (submitted) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Response submitted</h1><p className="mt-2 text-muted-foreground">Thank you for your response.</p></main>;
+  if (submitted) {
+    return (
+      <main className="mx-auto max-w-2xl p-8">
+        <h1 className="text-xl font-semibold">
+          {alreadySubmitted ? "You already submitted a response" : "Response submitted"}
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          {alreadySubmitted ? "This form does not allow another response from your recognized identity." : "Thank you for your response."}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">

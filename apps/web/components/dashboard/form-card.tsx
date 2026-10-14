@@ -14,6 +14,7 @@ export type FormSummary = {
   description?: string | null;
   formUrl?: string | null;
   isPublished: boolean;
+  isArchived: boolean;
   views?: number;
   createdAt: Date | string;
   updatedAt?: Date | string;
@@ -39,8 +40,8 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete, onPublish, on
     <Card className="flex min-h-64 flex-col">
       <CardHeader className="gap-4">
         <div className="flex items-start justify-between gap-4">
-          <Badge variant={form.isPublished ? "default" : "secondary"}>
-            {form.isPublished ? "Published" : "Draft"}
+          <Badge variant={form.isArchived ? "outline" : form.isPublished ? "default" : "secondary"}>
+            {form.isArchived ? "Archived" : form.isPublished ? "Published" : "Draft"}
           </Badge>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -49,13 +50,15 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete, onPublish, on
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}><Pencil />Edit details</DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/forms/${form.id}/responses`}><BarChart3 />View responses</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={copyShareLink} disabled={!form.formUrl}><Copy />Copy share link</DropdownMenuItem>
-              {form.isPublished ? <DropdownMenuItem onClick={onUnpublish}>Unpublish</DropdownMenuItem> : <DropdownMenuItem onClick={onPublish}>Publish</DropdownMenuItem>}
-              <DropdownMenuItem className="text-destructive" onClick={onDelete}><Trash2 />Delete form</DropdownMenuItem>
+              {!form.isArchived ? <>
+                <DropdownMenuItem onClick={onEdit}><Pencil />Edit details</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyShareLink} disabled={!form.formUrl}><Copy />Copy share link</DropdownMenuItem>
+                {form.isPublished ? <DropdownMenuItem onClick={onUnpublish}>Unpublish</DropdownMenuItem> : <DropdownMenuItem onClick={onPublish}>Publish</DropdownMenuItem>}
+                <DropdownMenuItem className="text-destructive" onClick={onDelete}><Trash2 />Archive form</DropdownMenuItem>
+              </> : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -71,8 +74,14 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete, onPublish, on
         <span>Updated {updatedAt.toLocaleDateString()}</span>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button asChild className="flex-1"><Link href={`/forms/${form.id}/builder`}><Pencil />Edit</Link></Button>
-        <Button variant="outline" size="icon" onClick={copyShareLink} disabled={!form.formUrl} aria-label="Copy share link"><ExternalLink /></Button>
+        {form.isArchived ? (
+          <Button asChild className="flex-1" variant="outline">
+            <Link href={`/forms/${form.id}/responses`}><BarChart3 />View responses</Link>
+          </Button>
+        ) : <>
+          <Button asChild className="flex-1"><Link href={`/forms/${form.id}/builder`}><Pencil />Edit</Link></Button>
+          <Button variant="outline" size="icon" onClick={copyShareLink} disabled={!form.formUrl} aria-label="Copy share link"><ExternalLink /></Button>
+        </>}
       </CardFooter>
     </Card>
   );

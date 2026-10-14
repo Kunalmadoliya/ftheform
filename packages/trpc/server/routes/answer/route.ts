@@ -22,6 +22,7 @@ export const answerRouter = router({
       formAnswerServiceInstance.saveAnswer({
         ...input,
         userId: ctx.userId,
+        respondentId: ctx.respondentId,
       }),
     ),
 
@@ -33,6 +34,7 @@ export const answerRouter = router({
       formAnswerServiceInstance.saveBulkAnswers({
         ...input,
         userId: ctx.userId,
+        respondentId: ctx.respondentId,
       }),
     ),
 

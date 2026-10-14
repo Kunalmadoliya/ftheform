@@ -16,6 +16,19 @@ interface AuthFormProps {
   mode: AuthMode;
 }
 
+export function getAuthReturnPath(value: string | null, origin: string) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return "/dashboard";
+  }
+  try {
+    const destination = new URL(value, origin);
+    if (destination.origin !== origin) return "/dashboard";
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return "/dashboard";
+  }
+}
+
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -41,7 +54,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      router.push("/dashboard");
+      const returnPath = getAuthReturnPath(
+        new URLSearchParams(window.location.search).get("next"),
+        window.location.origin,
+      );
+      router.replace(returnPath);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to connect. Please try again.");
       setIsPending(false);
@@ -55,7 +72,10 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       const result = await authClient.signIn.social({
         provider,
-        callbackURL: `${window.location.origin}/dashboard`,
+        callbackURL: `${window.location.origin}${getAuthReturnPath(
+          new URLSearchParams(window.location.search).get("next"),
+          window.location.origin,
+        )}`,
       });
 
       if (result.error) {

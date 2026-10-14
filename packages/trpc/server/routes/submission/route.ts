@@ -8,6 +8,7 @@ import {
   startSubmissionInput,
   submissionIdInput,
   submissionOutputSchema,
+  startSubmissionOutput,
   submissionsOutputSchema,
   versionMismatchInput,
   deleteSubmissionOutput,
@@ -20,17 +21,33 @@ export const submissionRouter = {
   startSubmission: publicProcedure
     .meta({ openapi: { method: "POST", path: submissionsPath("/start"), tags: TAGS } })
     .input(startSubmissionInput)
-    .output(submissionOutputSchema)
-    .mutation(({ ctx, input }) =>
-      formSubmissionServiceInstance.startSubmission({ ...input, userId: ctx.userId }),
-    ),
+    .output(startSubmissionOutput)
+    .mutation(async ({ ctx, input }) => {
+      const result = await formSubmissionServiceInstance.startSubmission({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      });
+      if (result.respondentIdToSet) ctx.setRespondentCookie(result.respondentIdToSet);
+      return result.outcome === "already_submitted"
+        ? {
+            status: "already_submitted" as const,
+            formId: result.formId,
+            submittedAt: result.submittedAt,
+          }
+        : result.submission;
+    }),
 
   getActiveSubmission: publicProcedure
     .meta({ openapi: { method: "GET", path: submissionsPath("/active/:formId"), tags: TAGS } })
     .input(startSubmissionInput)
     .output(submissionOutputSchema)
     .query(({ ctx, input }) =>
-      formSubmissionServiceInstance.getActiveSubmission({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.getActiveSubmission({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   getSubmissionById: protectedProcedure
@@ -48,7 +65,11 @@ export const submissionRouter = {
     .input(draftAnswerInput)
     .output(submissionOutputSchema)
     .mutation(({ ctx, input }) =>
-      formSubmissionServiceInstance.updateDraftAnswer({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.updateDraftAnswer({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   updateLastActivity: publicProcedure
@@ -56,7 +77,11 @@ export const submissionRouter = {
     .input(submissionIdInput)
     .output(submissionOutputSchema)
     .mutation(({ ctx, input }) =>
-      formSubmissionServiceInstance.updateLastActivity({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.updateLastActivity({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   submitForm: publicProcedure
@@ -64,7 +89,11 @@ export const submissionRouter = {
     .input(submissionIdInput)
     .output(submissionOutputSchema)
     .mutation(({ ctx, input }) =>
-      formSubmissionServiceInstance.submitForm({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.submitForm({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   markNotSubmitted: publicProcedure
@@ -72,14 +101,25 @@ export const submissionRouter = {
     .input(submissionIdInput)
     .output(submissionOutputSchema)
     .mutation(({ ctx, input }) =>
-      formSubmissionServiceInstance.markNotSubmitted({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.markNotSubmitted({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   checkVersionMismatch: publicProcedure
     .meta({ openapi: { method: "GET", path: submissionsPath("/:submissionId/version"), tags: TAGS } })
     .input(versionMismatchInput)
     .output(versionMismatchOutput)
-    .query(async ({ input }) => ({ id: input.submissionId, mismatch: await formSubmissionServiceInstance.checkVersionMismatch(input) })),
+    .query(async ({ ctx, input }) => ({
+      id: input.submissionId,
+      mismatch: await formSubmissionServiceInstance.checkVersionMismatch({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
+    })),
 
   listSubmissionsByForm: protectedProcedure
     .meta({

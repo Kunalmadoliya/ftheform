@@ -59,7 +59,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
   }
 
   async function handleDelete(formId: string) {
-    if (!window.confirm("Delete this form? This cannot be undone.")) return;
+    if (!window.confirm("Archive this form? It will stop accepting responses, but collected response history will be preserved.")) return;
     try {
       await deleteFormAsync({ formId });
     } catch (deleteError) {

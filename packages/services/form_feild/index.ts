@@ -19,7 +19,7 @@ export default class FormFieldService {
     const [owns] = await db
       .select({ id: form.id })
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
 
     if (!owns) {
       throw new Error("Form not found or does not belong to the user");
@@ -73,7 +73,7 @@ export default class FormFieldService {
     const [ownedForm] = await tx
       .select({ id: form.id })
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
     if (!ownedForm) throw new Error("Form not found");
 
     const [orderResult] = await tx

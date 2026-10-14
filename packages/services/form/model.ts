@@ -37,6 +37,19 @@ export const updateFormDescription = z.object({
 
 export type UpdateFormDescriptionType = z.infer<typeof updateFormDescription>;
 
+export const updateFormSettings = z.object({
+  formId: z.string().uuid(),
+  accessPolicy: z.enum([
+    "anonymous_and_authenticated",
+    "anonymous_only",
+    "authenticated_only",
+  ]),
+  allowMultipleSubmissions: z.boolean(),
+  userId: z.string(),
+});
+
+export type UpdateFormSettingsType = z.infer<typeof updateFormSettings>;
+
 export const deleteForm = z.object({
   formId: z.string().describe("form id"),
   userId: z.string().describe("user id"),

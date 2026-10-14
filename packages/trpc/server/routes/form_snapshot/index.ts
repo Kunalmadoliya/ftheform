@@ -16,7 +16,9 @@ export const formSnapshotRouter = {
     .meta({ openapi: { method: "GET", path: snapshotsPath("/latest"), tags: TAGS } })
     .input(snapshotByFormInput)
     .output(snapshotOutputSchema)
-    .query(({ input }) => formSnapshotServiceInstance.getLatestSnapshot(input)),
+    .query(({ ctx, input }) =>
+      formSnapshotServiceInstance.getLatestSnapshot(input, ctx.userId),
+    ),
 
   getSnapshotById: authenticatedProcedure
     .meta({

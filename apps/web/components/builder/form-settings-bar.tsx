@@ -11,18 +11,26 @@ type FormSettingsBarProps = {
   isPublished: boolean;
   isOpen: boolean;
   responseLimit: number;
+  accessPolicy: "anonymous_and_authenticated" | "anonymous_only" | "authenticated_only";
+  allowMultipleSubmissions: boolean;
   canEditResponseLimit: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onResponseLimitSave: (responseLimit: number) => void;
+  onAccessPolicyChange: (policy: FormSettingsBarProps["accessPolicy"]) => void;
+  onMultipleSubmissionsChange: (allowed: boolean) => void;
 };
 
 export function FormSettingsBar({
   isPublished,
   isOpen,
   responseLimit,
+  accessPolicy,
+  allowMultipleSubmissions,
   canEditResponseLimit,
   onOpenChange,
   onResponseLimitSave,
+  onAccessPolicyChange,
+  onMultipleSubmissionsChange,
 }: FormSettingsBarProps) {
   const [responseLimitDraft, setResponseLimitDraft] = useState(String(responseLimit));
   useEffect(() => setResponseLimitDraft(String(responseLimit)), [responseLimit]);
@@ -74,6 +82,59 @@ export function FormSettingsBar({
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>Accept submissions</span>
         <Switch checked={isOpen} onCheckedChange={onOpenChange} />
+      </label>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Who can respond?</legend>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="radio"
+            name="form-access-policy"
+            value="anonymous_and_authenticated"
+            checked={accessPolicy === "anonymous_and_authenticated"}
+            onChange={() => onAccessPolicyChange("anonymous_and_authenticated")}
+          />
+          <span>
+            Anyone
+            <span className="block text-xs text-muted-foreground">Anonymous and signed-in respondents can respond.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="radio"
+            name="form-access-policy"
+            value="anonymous_only"
+            checked={accessPolicy === "anonymous_only"}
+            onChange={() => onAccessPolicyChange("anonymous_only")}
+          />
+          <span>
+            Anonymous only
+            <span className="block text-xs text-muted-foreground">Respondents must be signed out.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="radio"
+            name="form-access-policy"
+            value="authenticated_only"
+            checked={accessPolicy === "authenticated_only"}
+            onChange={() => onAccessPolicyChange("authenticated_only")}
+          />
+          <span>
+            Sign-in required
+            <span className="block text-xs text-muted-foreground">Respondents must sign in before accessing the form.</span>
+          </span>
+        </label>
+      </fieldset>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={allowMultipleSubmissions}
+          onChange={(event) => onMultipleSubmissionsChange(event.target.checked)}
+        />
+        <span>
+          Allow multiple submissions
+          <span className="block text-xs text-muted-foreground">The same recognized respondent can submit again.</span>
+        </span>
       </label>
     </section>
   );

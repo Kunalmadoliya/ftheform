@@ -10,15 +10,23 @@ import {
 } from "./model";
 import { formSnapshot, form, formField } from "@repo/database/models/form-schema";
 import { and, asc, db, desc, eq } from "@repo/database";
+import { assertFormAccess } from "../form/access";
 
 type SnapshotTransaction = Pick<typeof db, "select" | "insert">;
 
 export default class FormSnapshotService {
-  public async getLatestFormSnapshotById(input: getFormSnapshotType) {
+  public async getLatestFormSnapshotById(input: getFormSnapshotType, userId?: string | null) {
     const { formId } = await getLatestFormSnapshotById.parseAsync(input);
 
     const [checkForm] = await db
-      .select({ currentVersion: form.currentVersion, isPublished: form.isPublished })
+      .select({
+        currentVersion: form.currentVersion,
+        isPublished: form.isPublished,
+        isOpen: form.isOpen,
+        isArchived: form.isArchived,
+        ownerId: form.userId,
+        accessPolicy: form.accessPolicy,
+      })
       .from(form)
       .where(eq(form.id, formId))
       .limit(1);
@@ -26,7 +34,10 @@ export default class FormSnapshotService {
     if (!checkForm) {
       throw new Error("Form not found");
     }
+    if (checkForm.isArchived || !checkForm.ownerId) throw new Error("Form is archived");
     if (!checkForm.isPublished) throw new Error("Form is not published");
+    if (!checkForm.isOpen) throw new Error("Form is closed");
+    assertFormAccess(checkForm.accessPolicy, userId);
 
     const [snapshot] = await db
       .select()
@@ -67,8 +78,8 @@ export default class FormSnapshotService {
     return this.getLatestFormSnapshot(input);
   }
 
-  public async getLatestSnapshot(input: getFormSnapshotType) {
-    return this.getLatestFormSnapshotById(input);
+  public async getLatestSnapshot(input: getFormSnapshotType, userId?: string | null) {
+    return this.getLatestFormSnapshotById(input, userId);
   }
 
   public async createSnapshot(input: createSnapshotInputType, tx: SnapshotTransaction) {

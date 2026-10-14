@@ -29,6 +29,12 @@ export function useForm() {
       void utils.form.getFormById.invalidate();
     },
   });
+  const updateFormSettingsMutation = trpc.form.updateSettings.useMutation({
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
+  });
   const deleteFormMutation = trpc.form.deleteForm.useMutation({
     onSuccess: () => utils.form.listFormsByUser.invalidate(),
   });
@@ -67,6 +73,7 @@ export function useForm() {
     renameFormAsync: renameFormMutation.mutateAsync,
     updateFormDescription: updateFormDescriptionMutation.mutate,
     updateFormDescriptionAsync: updateFormDescriptionMutation.mutateAsync,
+    updateSettingsAsync: updateFormSettingsMutation.mutateAsync,
     deleteForm: deleteFormMutation.mutate,
     deleteFormAsync: deleteFormMutation.mutateAsync,
     toggleFormOpen: toggleFormOpenMutation.mutate,

@@ -24,7 +24,7 @@ export default class FormAiService {
     const [ownedForm] = await db
       .select({ id: form.id })
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
     if (!ownedForm) throw new Error("Form not found");
 
     const [job] = await db
