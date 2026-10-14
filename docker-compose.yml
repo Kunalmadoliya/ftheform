@@ -22,14 +22,11 @@ services:
       dockerfile: apps/api/Dockerfile
       target: migrator
     environment:
-      NODE_ENV: production
-      PROD_DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
+      NODE_ENV: ${NODE_ENV:?Set NODE_ENV in .env}
+      DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
       WEB_URL: ${WEB_URL:?Set WEB_URL in .env}
-      CORS_ORIGINS: ${CORS_ORIGINS:-${WEB_URL:-http://localhost:3000}}
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-${WEB_URL:-http://localhost:3000}}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?Set GITHUB_CLIENT_ID in .env}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?Set GITHUB_CLIENT_SECRET in .env}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
@@ -45,11 +42,10 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      PORT: 4000
-      PROD_DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
+      NODE_ENV: ${NODE_ENV:?Set NODE_ENV in .env}
+      PORT: ${PORT:?Set PORT in .env}
+      DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in .env}
       RESPONDENT_COOKIE_SECRET: ${RESPONDENT_COOKIE_SECRET:?Set RESPONDENT_COOKIE_SECRET in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
       WEB_URL: ${WEB_URL:?Set WEB_URL in .env}
@@ -65,7 +61,7 @@ services:
       INNGEST_SIGNING_KEY: ${INNGEST_SIGNING_KEY:-}
       LOGGER_LEVEL: ${LOGGER_LEVEL:-info}
     ports:
-      - "127.0.0.1:4000:4000"
+      - "127.0.0.1:${PORT}:${PORT}"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -74,7 +70,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        - "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 10s
       timeout: 3s
       retries: 5
@@ -85,12 +81,14 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
+        NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL:?Set NEXT_PUBLIC_WEB_URL to the public web origin in .env}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL to the public /trpc URL in .env}
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      PORT: ${WEB_PORT:?Set WEB_PORT in .env}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${WEB_PORT}:${WEB_PORT}"
     depends_on:
       api:
         condition: service_healthy

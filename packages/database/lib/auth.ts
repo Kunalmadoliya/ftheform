@@ -6,9 +6,11 @@ import * as schema from "../auth-schema";
 
 import { db } from "../index";
 
+const isProduction = env.NODE_ENV === "production";
+
 export const auth = betterAuth({
   baseURL: env.BASE_URL,
-  trustedOrigins: env.TRUSTED_ORIGINS?.length ? env.TRUSTED_ORIGINS : [env.WEB_URL],
+  trustedOrigins: [env.WEB_URL],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -70,5 +72,10 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "ftheform",
+    defaultCookieAttributes: {
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+      httpOnly: true,
+    },
   },
 });

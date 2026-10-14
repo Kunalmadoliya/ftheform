@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthForm } from "~/components/auth/auth-form";
 import { authClient } from "~/lib/auth-client";
 import { getAuthReturnPath } from "~/lib/auth-redirect";
+import { env } from "~/env";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function SignUpPage() {
     if (!isPending && session?.user) {
       router.replace(getAuthReturnPath(
         new URLSearchParams(window.location.search).get("next"),
-        window.location.origin,
+        env.NEXT_PUBLIC_WEB_URL,
       ));
     }
   }, [isPending, router, session]);

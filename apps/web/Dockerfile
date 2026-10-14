@@ -11,7 +11,9 @@ COPY --from=pruner /repo/out/json/ .
 RUN pnpm install --frozen-lockfile
 COPY --from=pruner /repo/out/full/ .
 
+ARG NEXT_PUBLIC_WEB_URL
 ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WEB_URL=$NEXT_PUBLIC_WEB_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm turbo build --filter=web
 
@@ -22,5 +24,4 @@ COPY --from=builder --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=builder --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=node:node /repo/apps/web/public ./apps/web/public
 USER node
-EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

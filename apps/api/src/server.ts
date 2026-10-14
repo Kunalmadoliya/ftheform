@@ -23,6 +23,7 @@ import { createPublicProcedureRateLimit } from "./public-rate-limit";
 import { env } from "./env";
 
 export const app = express();
+app.set("trust proxy", 1);
 app.use(helmet());
 const openApiDocument = generateOpenApiDocument(serverRouter, {
   title: "FTHEFORM",
@@ -32,7 +33,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 
 app.use(
   cors({
-    origin: env.CORS_ORIGINS?.length ? env.CORS_ORIGINS : [env.WEB_URL],
+    origin: env.WEB_URL,
     credentials: true,
   }),
 );

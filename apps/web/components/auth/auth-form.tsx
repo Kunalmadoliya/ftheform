@@ -10,6 +10,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
 import { getAuthCallbackUrl, getAuthPageHref, getAuthReturnPath } from "~/lib/auth-redirect";
+import { env } from "~/env";
 
 export { getAuthReturnPath } from "~/lib/auth-redirect";
 
@@ -40,7 +41,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsPending(true);
 
     try {
-      const callbackURL = getAuthCallbackUrl(nextPath, window.location.origin);
+      const callbackURL = getAuthCallbackUrl(nextPath, env.NEXT_PUBLIC_WEB_URL);
       const result = isSignUp
         ? await authClient.signUp.email({ name, email, password, callbackURL })
         : await authClient.signIn.email({ email, password });
@@ -58,7 +59,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
       const returnPath = getAuthReturnPath(
         nextPath,
-        window.location.origin,
+        env.NEXT_PUBLIC_WEB_URL,
       );
       router.replace(returnPath);
     } catch (requestError) {
@@ -76,7 +77,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         provider,
         callbackURL: getAuthCallbackUrl(
           nextPath,
-          window.location.origin,
+          env.NEXT_PUBLIC_WEB_URL,
         ),
       });
 

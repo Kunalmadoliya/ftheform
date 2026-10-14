@@ -7,9 +7,8 @@ import { env } from "./env";
 async function init() {
   try {
     const server = http.createServer(expressApplication);
-    const PORT: number = env.PORT ? +env.PORT : 4000;
-    server.listen(PORT, () => {
-      logger.info(`http server is running on PORT ${PORT}`);
+    server.listen(env.PORT, () => {
+      logger.info(`http server is running on PORT ${env.PORT}`);
     });
   } catch (err) {
     logger.error(`Error creating http server`, { err });

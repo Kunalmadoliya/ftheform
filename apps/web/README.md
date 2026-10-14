@@ -10,14 +10,15 @@ From the repository root:
 pnpm --filter web dev
 ```
 
-Open `http://localhost:3000`. The API must be running separately with `pnpm --filter @repo/api dev`.
+Open the web origin configured in `NEXT_PUBLIC_WEB_URL`. The API must be running separately with `pnpm --filter @repo/api dev`.
 
 ## Environment
 
-Set `NEXT_PUBLIC_API_URL` to the API's TRPC endpoint:
+Set both validated public origins. `NEXT_PUBLIC_API_URL` must end in `/trpc`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/trpc
+NEXT_PUBLIC_WEB_URL=<public-web-origin>
+NEXT_PUBLIC_API_URL=<public-api-origin>/trpc
 ```
 
 Authentication uses the Better Auth session cookie supplied by the API, so the API CORS configuration must allow the web origin.
@@ -39,4 +40,4 @@ pnpm --filter web build
 pnpm --filter web start
 ```
 
-Deploy this app as a standard Next.js application. Set `NEXT_PUBLIC_API_URL` at build time, and configure the API's `WEB_URL` to the deployed frontend origin.
+Deploy this app as a standard Next.js application. Set both variables at build time, and configure the API's `WEB_URL` to exactly match `NEXT_PUBLIC_WEB_URL`.

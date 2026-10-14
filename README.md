@@ -29,15 +29,20 @@ FTHEFORM is a pnpm/Turborepo monorepo for authenticated form creation and manage
 
 ```bash
 pnpm install
+```
+
+Copy `.env.example` to `.env` and set `DATABASE_URL` for the host database. `NODE_ENV`, `PORT`, `BASE_URL`, `WEB_URL`, `BETTER_AUTH_SECRET`, and `DATABASE_URL` are validated before the API starts. The API also needs provider credentials and, for email verification, `RESEND_API_KEY` and `EMAIL_FROM`. The web requires `NEXT_PUBLIC_WEB_URL` and `NEXT_PUBLIC_API_URL` at build time.
+
+The API allows browser requests only from `WEB_URL`; Better Auth uses the same origin as its trusted origin. In production both URLs must use HTTPS and must not point to localhost.
+
+Set `RESPONDENT_COOKIE_SECRET` to a separate random value of at least 32 characters; it signs respondent identity cookies and must be shared by every API instance. Prefer hosting the web app and API under the same site (for example, `forms.example.com` and `api.example.com`): the respondent cookie can then use `SameSite=Lax`. When the web and API are on different sites, production uses `SameSite=None; Secure`, which requires HTTPS and may be restricted by browser third-party-cookie policies.
+
+After configuring `.env`, start the database and apply migrations:
+
+```bash
 pnpm db:up
 pnpm db:migrate
 ```
-
-Configure `DEV_DATABASE_URL` for the API running on the host (`localhost:5432`) and `PROD_DATABASE_URL` for the API and migrations running in Compose (the `postgresdb` service hostname). `NODE_ENV` must be `development` or `production`; the database package selects and validates the matching URL. The API also needs Better Auth secrets and provider credentials, `BASE_URL`, `WEB_URL`, `RESEND_API_KEY`, and `EMAIL_FROM` so it can send required email-verification links. The web needs `NEXT_PUBLIC_API_URL`.
-
-Set comma-separated `CORS_ORIGINS` and `TRUSTED_ORIGINS` for every browser origin allowed to call the API or use Better Auth. Both default to `WEB_URL` when unset. The interactive `/docs` page is enabled only in development.
-
-Set `RESPONDENT_COOKIE_SECRET` to a separate random value of at least 32 characters; it signs respondent identity cookies and must be shared by every API instance. Prefer hosting the web app and API under the same site (for example, `forms.example.com` and `api.example.com`): the respondent cookie can then use `SameSite=Lax`. When the web and API are on different sites, production uses `SameSite=None; Secure`, which requires HTTPS and may be restricted by browser third-party-cookie policies.
 
 ## Development
 
@@ -46,11 +51,11 @@ pnpm --filter @repo/api dev
 pnpm --filter web dev
 ```
 
-The web app runs on `http://localhost:3000`. The API runs on `http://localhost:4000` by default.
+The web and API origins are `NEXT_PUBLIC_WEB_URL`/`WEB_URL` and `BASE_URL`, respectively. Set them to the development origins from `.env.example`; Next.js reads its port from its normal development-server default, and the API listens on `PORT`.
 
 ### AI form generation
 
-AI generation runs in the API process through Inngest and uses the existing OpenAI SDK on the server only. Configure `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4.1-mini`) in the root `.env`; never add these values to `NEXT_PUBLIC_*` variables. The Inngest SDK uses `INNGEST_DEV=http://localhost:8288` to send local events to its development server. Local development does not require Inngest Cloud event or signing keys.
+AI generation runs in the API process through Inngest and uses the existing OpenAI SDK on the server only. Configure `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4.1-mini`) in the root `.env`; never add these values to `NEXT_PUBLIC_*` variables. The Inngest SDK uses `INNGEST_DEV` to send local events to its development server. Local development does not require Inngest Cloud event or signing keys.
 
 Apply the generation-job table migration before using the feature:
 
@@ -62,7 +67,7 @@ Start these processes in separate terminals:
 
 ```bash
 pnpm --filter @repo/api dev
-npx inngest-cli@latest dev -u http://localhost:4000/api/inngest
+npx inngest-cli@latest dev -u "$BASE_URL/api/inngest"
 pnpm --filter web dev
 ```
 
@@ -80,10 +85,31 @@ The browser uses the typed TRPC client in `apps/web/trpc`. Requests go to the AP
 
 The API also serves `/health`, `/openapi.json`, `/docs`, `/api/auth/*`, and the OpenAPI-backed `/api/*` procedures.
 
-## Deployment
+## Deploying
 
-Deploy `apps/api` and `apps/web` as separate applications. Build from the repository root with `pnpm --filter @repo/api build` and `pnpm --filter web build`. Run the API with `pnpm --filter @repo/api start`. Configure the production database, auth settings, public API URL, allowed web origin, and `NEXT_PUBLIC_API_URL`. Apply database migrations before starting the API.
+Deploy `apps/web` to Vercel and `apps/api` to Render, building both from the repository root with `pnpm --filter web build` and `pnpm --filter @repo/api build`. Set the web build environment variables in Vercel:
 
-For the included Compose setup, start PostgreSQL with `docker compose up -d postgresdb`. Development uses `DEV_DATABASE_URL` from the host; production uses a separate `PROD_DATABASE_URL` on the `postgresdb` service. Provision that production database once before starting the production stack, for example `docker compose exec postgresdb sh -c 'createdb -U "$POSTGRES_USER" ftheform_prod'`. Then run `docker compose up -d --build`; Compose waits for PostgreSQL health and successful migrations before starting the API.
+- `NEXT_PUBLIC_WEB_URL=https://ftheform.vercel.app`
+- `NEXT_PUBLIC_API_URL=https://<RENDER_API_URL>/trpc`
+
+Set these API environment variables in Render (Render provides `PORT`; use the database connection string provisioned for the API):
+
+- `NODE_ENV=production`
+- `PORT` (provided by Render)
+- `BASE_URL=https://<RENDER_API_URL>`
+- `WEB_URL=https://ftheform.vercel.app`
+- `DATABASE_URL` (the production PostgreSQL connection string)
+- `BETTER_AUTH_SECRET` and `RESPONDENT_COOKIE_SECRET` (separate random values of at least 32 characters)
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`
+- `RESEND_API_KEY` and `EMAIL_FROM` for verification email delivery
+
+Register these OAuth callback URLs with the providers:
+
+- `https://<RENDER_API_URL>/api/auth/callback/google`
+- `https://<RENDER_API_URL>/api/auth/callback/github`
+
+The API rejects production configuration unless both public origins use HTTPS and neither points to localhost. Apply database migrations before serving traffic. For the included Compose setup, set `PROD_DATABASE_URL` to the database service URL and use the development/database settings from `.env.example`; provision the separate Compose database before starting the stack.
+
+The interactive `/docs` page is enabled only in development.
 
 # Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager

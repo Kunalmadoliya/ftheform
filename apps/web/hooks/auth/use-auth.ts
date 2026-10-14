@@ -1,6 +1,7 @@
 import { trpc } from "~/trpc/client";
 import { authClient } from "~/lib/auth-client";
 import { getAuthCallbackUrl } from "~/lib/auth-redirect";
+import { env } from "~/env";
 
 export function useSignin() {
   const {
@@ -60,7 +61,7 @@ export function useGoogleSignIn() {
       provider: "google",
       callbackURL: getAuthCallbackUrl(
         new URLSearchParams(window.location.search).get("next"),
-        window.location.origin,
+        env.NEXT_PUBLIC_WEB_URL,
       ),
     });
 
@@ -73,7 +74,7 @@ export function useGithubSignIn() {
       provider: "github",
       callbackURL: getAuthCallbackUrl(
         new URLSearchParams(window.location.search).get("next"),
-        window.location.origin,
+        env.NEXT_PUBLIC_WEB_URL,
       ),
     });
 
