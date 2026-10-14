@@ -57,7 +57,11 @@ export const submissionRouter = {
     .input(submissionIdInput)
     .output(submissionOutputSchema)
     .query(({ ctx, input }) =>
-      formSubmissionServiceInstance.getSubmissionById({ ...input, userId: ctx.userId }),
+      formSubmissionServiceInstance.getSubmissionById({
+        ...input,
+        userId: ctx.userId,
+        respondentId: ctx.respondentId,
+      }),
     ),
 
   updateDraftAnswer: publicProcedure

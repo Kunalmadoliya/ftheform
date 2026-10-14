@@ -1,4 +1,4 @@
-import { and, db, desc, eq, isNotNull, sql } from "@repo/database";
+import { and, count, db, desc, eq, isNotNull, or, sql } from "@repo/database";
 import {
   createInitialForm,
   deleteForm,
@@ -27,7 +27,7 @@ import {
   unpublishForm,
   type UnpublishFormType,
 } from "./model";
-import { form, formField, formSnapshot, formView } from "@repo/database/models/form-schema";
+import { form, formField, formSnapshot, formView, submission } from "@repo/database/models/form-schema";
 import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
@@ -92,18 +92,38 @@ export default class FormService {
   public async getPublicFormById(input: GetPublicFormByIdType, userId?: string | null) {
     const { formId } = await getPublicFormById.parseAsync(input);
     const [foundForm] = await db
-      .select(this.formSelection())
+      .select({ ...this.formSelection(), ownerId: form.userId })
       .from(form)
       .where(and(
         eq(form.id, formId),
-        eq(form.isPublished, true),
         eq(form.isArchived, false),
         isNotNull(form.userId),
+        or(eq(form.isPublished, true), userId ? eq(form.userId, userId) : undefined),
       ));
 
     if (!foundForm) throw serviceError("NOT_FOUND", "Form not found");
-    assertFormAccess(foundForm.accessPolicy, userId);
-    return foundForm;
+    const isOwner = Boolean(userId && foundForm.ownerId === userId);
+    if (!isOwner) assertFormAccess(foundForm.accessPolicy, userId);
+    let submittedResponseCount = 0;
+    if (foundForm.isPublished && foundForm.isOpen) {
+      const [submittedResponses] = await db
+        .select({ count: count() })
+        .from(submission)
+        .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")));
+      if (!submittedResponses) {
+        throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form response limit");
+      }
+      submittedResponseCount = submittedResponses.count;
+    }
+    const { ownerId: _ownerId, ...publicForm } = foundForm;
+    return {
+      ...publicForm,
+      isOwner,
+      acceptingResponses:
+        foundForm.isPublished &&
+        foundForm.isOpen &&
+        submittedResponseCount < foundForm.responseLimit,
+    };
   }
 
   public async renameForm(input: RenameFormType) {

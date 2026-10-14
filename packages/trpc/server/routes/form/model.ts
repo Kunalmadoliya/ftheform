@@ -35,6 +35,8 @@ export const getFormByIdOutput = formOutput;
 
 export const getPublicFormByIdOutput = formOutput.extend({
   isOpen: z.boolean(),
+  isOwner: z.boolean(),
+  acceptingResponses: z.boolean(),
 });
 
 export const renameFormInput = z.object({

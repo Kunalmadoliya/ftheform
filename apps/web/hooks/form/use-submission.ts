@@ -1,13 +1,15 @@
 import { trpc } from "~/trpc/client";
+import { authClient } from "~/lib/auth-client";
 
 export function useSubmission(formId: string, submissionId?: string) {
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
   const activeSubmissionQuery = trpc.submission.getActiveSubmission.useQuery(
     { formId, submissionId },
     { enabled: Boolean(formId && submissionId), retry: false },
   );
   const submissionQuery = trpc.submission.getSubmissionById.useQuery(
     { submissionId: submissionId ?? "" },
-    { enabled: Boolean(submissionId), retry: false },
+    { enabled: Boolean(submissionId && session?.user && !isSessionPending), retry: false },
   );
   const startMutation = trpc.submission.startSubmission.useMutation();
   const draftMutation = trpc.submission.updateDraftAnswer.useMutation();

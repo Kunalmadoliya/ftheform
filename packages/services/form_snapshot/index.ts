@@ -36,9 +36,10 @@ export default class FormSnapshotService {
       throw serviceError("NOT_FOUND", "Form not found");
     }
     if (checkForm.isArchived || !checkForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
-    if (!checkForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
-    if (!checkForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
-    assertFormAccess(checkForm.accessPolicy, userId);
+    const isOwner = Boolean(userId && checkForm.ownerId === userId);
+    if (!checkForm.isPublished && !isOwner) throw serviceError("FORBIDDEN", "Form is not published");
+    if (!checkForm.isOpen && !isOwner) throw serviceError("FORBIDDEN", "Form is closed");
+    if (!isOwner) assertFormAccess(checkForm.accessPolicy, userId);
 
     const [snapshot] = await db
       .select()
@@ -47,7 +48,21 @@ export default class FormSnapshotService {
       .orderBy(desc(formSnapshot.createdAt))
       .limit(1);
 
-    if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
+    if (!snapshot) {
+      if (!isOwner) throw serviceError("NOT_FOUND", "Form snapshot not found");
+      const fields = await db
+        .select()
+        .from(formField)
+        .where(eq(formField.formId, formId))
+        .orderBy(asc(formField.fieldOrder));
+      return {
+        id: `preview-${formId}`,
+        formId,
+        versions: checkForm.currentVersion,
+        fieldsJson: fields,
+        createdAt: new Date(),
+      };
+    }
     return snapshot;
   }
 

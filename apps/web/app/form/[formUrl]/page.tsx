@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -12,6 +12,8 @@ import { usePublicForm } from "~/hooks/form/use-public-form";
 import { useSubmission } from "~/hooks/form/use-submission";
 import { toast } from "sonner";
 import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
+import { authClient } from "~/lib/auth-client";
+import { env } from "~/env";
 
 type FormField = {
   id: string;
@@ -52,6 +54,7 @@ export default function PublicFormPage() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [interactionError, setInteractionError] = useState("");
   const autosaveTimer = useRef<number | undefined>(undefined);
+  const autosaveQueue = useRef<Promise<void>>(Promise.resolve());
   const viewAttemptedFor = useRef("");
   const {
     startSubmissionAsync,
@@ -64,6 +67,14 @@ export default function PublicFormPage() {
     submitError,
   } = useSubmission(formId, submissionId);
   const fields = useMemo(() => getFields(snapshot?.fieldsJson), [snapshot?.fieldsJson]);
+  const saveDraft = useCallback((draftAnswer: Record<string, unknown>) => {
+    if (!submissionId) return Promise.resolve();
+    const queuedSave = autosaveQueue.current.then(async () => {
+      await updateDraftAnswerAsync({ submissionId, draftAnswer });
+    });
+    autosaveQueue.current = queuedSave.catch(() => undefined);
+    return queuedSave;
+  }, [submissionId, updateDraftAnswerAsync]);
 
   useEffect(() => {
     if (!formId || !form || viewAttemptedFor.current === formId) return;
@@ -74,7 +85,7 @@ export default function PublicFormPage() {
   }, [form, formId, incrementViewAsync]);
 
   useEffect(() => {
-    if (!formId || !form || submissionId) return;
+    if (!formId || !form || form.isOwner || submissionId) return;
     const startOrResume = () => startSubmissionAsync({ formId });
     const startRequest = async () => (
       navigator.locks
@@ -107,7 +118,7 @@ export default function PublicFormPage() {
     if (!submissionId || submitted) return;
     const timer = window.setTimeout(() => {
       autosaveTimer.current = undefined;
-      void updateDraftAnswerAsync({ submissionId, draftAnswer: answers }).catch((error: unknown) => {
+      void saveDraft(answers).catch((error: unknown) => {
         setInteractionError(getTrpcErrorMessage(error, "Unable to save your progress."));
       });
     }, 500);
@@ -116,7 +127,36 @@ export default function PublicFormPage() {
       window.clearTimeout(timer);
       if (autosaveTimer.current === timer) autosaveTimer.current = undefined;
     };
-  }, [answers, submissionId, submitted, updateDraftAnswerAsync]);
+  }, [answers, submissionId, submitted, saveDraft]);
+
+  useEffect(() => {
+    if (!submissionId || submitted || form?.isOwner) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (autosaveTimer.current !== undefined) {
+        window.clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = undefined;
+      }
+
+      const sendDraftBeacon = () => {
+        const endpoint = `${env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")}/submission.updateDraftAnswer`;
+        const body = new Blob(
+          [JSON.stringify({ json: { submissionId, draftAnswer: answers } })],
+          { type: "application/json" },
+        );
+        if (!navigator.sendBeacon(endpoint, body)) {
+          void saveDraft(answers).catch((error: unknown) => {
+            setInteractionError(getTrpcErrorMessage(error, "Unable to save your progress."));
+          });
+        }
+      };
+      void autosaveQueue.current.then(sendDraftBeacon, sendDraftBeacon);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [answers, form?.isOwner, saveDraft, submissionId, submitted]);
 
   function updateAnswer(fieldId: string, value: unknown) {
     setAnswers((current) => ({ ...current, [fieldId]: value }));
@@ -149,7 +189,7 @@ export default function PublicFormPage() {
     }
     setInteractionError("");
     try {
-      await updateDraftAnswerAsync({ submissionId, draftAnswer: answers });
+      await saveDraft(answers);
       const result = await submitFormAsync({ submissionId });
       setAlreadySubmitted(result.id !== submissionId);
       setSubmitted(true);
@@ -177,11 +217,32 @@ export default function PublicFormPage() {
       <main className="mx-auto max-w-2xl p-8">
         <h1 className="text-xl font-semibold">Anonymous responses only</h1>
         <p className="mt-2 text-muted-foreground">Sign out of your account to respond to this form.</p>
+        <Button
+          className="mt-4"
+          onClick={async () => {
+            try {
+              await authClient.signOut();
+              await formQuery.refetch();
+            } catch (error) {
+              toast.error(getTrpcErrorMessage(error, "Unable to sign out."));
+            }
+          }}
+        >
+          Sign out
+        </Button>
       </main>
     );
   }
   if (formQuery.isError || !form) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
-  if (!form.isOpen) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">This form is closed</h1></main>;
+  if (!form.acceptingResponses && !form.isOwner) {
+    return (
+      <main className="mx-auto max-w-2xl p-8">
+        <h1 className="text-xl font-semibold">
+          {!form.isPublished || !form.isOpen ? "This form is closed" : "This form has reached its response limit"}
+        </h1>
+      </main>
+    );
+  }
   if (snapshotQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
   if (snapshotQuery.isError || !snapshot) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">This form is unavailable</h1></main>;
   if (submitted) {
@@ -199,6 +260,11 @@ export default function PublicFormPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
+      {form.isOwner ? (
+        <p className="mb-4 border border-border bg-muted px-4 py-3 text-sm">
+          Preview mode — responses cannot be submitted.
+        </p>
+      ) : null}
       <header className="border-b pb-6">
         <h1 className="text-3xl font-semibold">{form.title}</h1>
         {form.description ? <p className="mt-3 text-muted-foreground">{form.description}</p> : null}
@@ -246,8 +312,8 @@ export default function PublicFormPage() {
             Start a new response
           </Button>
         ) : null}
-        <Button type="submit" disabled={!submissionId || isSubmitting || isSavingDraft || versionQuery.data?.mismatch}>
-          {isSubmitting || isSavingDraft ? "Submitting..." : "Submit response"}
+        <Button type="submit" disabled={form.isOwner || !submissionId || isSubmitting || isSavingDraft || versionQuery.data?.mismatch}>
+          {form.isOwner ? "Preview only" : isSubmitting || isSavingDraft ? "Submitting..." : "Submit response"}
         </Button>
       </form>
     </main>

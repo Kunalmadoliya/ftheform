@@ -7,7 +7,10 @@ export function usePublicForm(formId: string) {
     { formId },
     { enabled: Boolean(formId), retry: false },
   );
-  const snapshotQuery = useLatestFormSnapshot(formId, Boolean(formQuery.data?.isPublished));
+  const snapshotQuery = useLatestFormSnapshot(
+    formId,
+    Boolean(formQuery.data?.isPublished || formQuery.data?.isOwner),
+  );
   const incrementViewMutation = trpc.form.incrementFormViewCount.useMutation();
 
   return {
