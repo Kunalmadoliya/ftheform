@@ -12,6 +12,7 @@ const publicProcedures = new Set([
   "submission.submitForm",
   "submission.markNotSubmitted",
   "submission.checkVersionMismatch",
+  "submission.deleteSubmission",
   "answer.saveAnswer",
   "answer.saveBulkAnswers",
 ]);

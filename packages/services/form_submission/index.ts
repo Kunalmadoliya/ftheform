@@ -613,24 +613,38 @@ export default class SubmissionService {
   }
 
   public async deleteSubmission(input: deleteSubmissionSchemaType) {
-    const { submissionId, userId } = await deleteSubmissionSchema.parseAsync(input);
-    const [existingSubmission] = await db
-      .select({ userId: submission.userId, formOwnerId: form.userId })
-      .from(submission)
-      .innerJoin(form, eq(submission.formId, form.id))
-      .where(eq(submission.id, submissionId))
-      .limit(1);
-    if (
-      !existingSubmission ||
-      (existingSubmission.userId !== userId && existingSubmission.formOwnerId !== userId)
-    ) {
-      throw serviceError("NOT_FOUND", "Submission not found");
+    const { submissionId, userId, respondentId } = await deleteSubmissionSchema.parseAsync(input);
+    if (!userId && !respondentId) {
+      throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
     }
-    const [deletedSubmission] = await db
-      .delete(submission)
-      .where(eq(submission.id, submissionId))
-      .returning({ id: submission.id });
-    if (!deletedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
-    return deletedSubmission;
+    return db.transaction(async (tx) => {
+      const [existingSubmission] = await tx
+        .select({
+          userId: submission.userId,
+          respondentId: submission.respondentId,
+          status: submission.status,
+          formOwnerId: form.userId,
+        })
+        .from(submission)
+        .innerJoin(form, eq(submission.formId, form.id))
+        .where(eq(submission.id, submissionId))
+        .for("update");
+      const isRespondent =
+        Boolean(userId && existingSubmission?.userId === userId) ||
+        Boolean(respondentId && existingSubmission?.respondentId === respondentId);
+      const isOwner = Boolean(userId && existingSubmission?.formOwnerId === userId);
+      const mayDeleteDraft = isRespondent && existingSubmission?.status === "filling";
+      const mayDeleteSubmitted = isOwner && existingSubmission?.status === "submitted";
+      if (!existingSubmission || (!mayDeleteDraft && !mayDeleteSubmitted)) {
+        throw serviceError("NOT_FOUND", "Submission not found");
+      }
+
+      const [deletedSubmission] = await tx
+        .delete(submission)
+        .where(eq(submission.id, submissionId))
+        .returning({ id: submission.id });
+      if (!deletedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
+      return deletedSubmission;
+    });
   }
 }

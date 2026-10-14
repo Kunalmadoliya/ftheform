@@ -140,13 +140,12 @@ export const submissionRouter = {
     .output(submissionsOutputSchema)
     .query(({ ctx }) => formSubmissionServiceInstance.listSubmissionsByUser({ userId: ctx.userId })),
 
-  deleteSubmission: protectedProcedure
+  deleteSubmission: publicProcedure
     .meta({
       openapi: {
         method: "DELETE",
         path: submissionsPath("/:submissionId"),
         tags: TAGS,
-        protect: true,
       },
     })
     .input(submissionIdInput)
@@ -155,6 +154,7 @@ export const submissionRouter = {
       formSubmissionServiceInstance.deleteSubmission({
         ...input,
         userId: ctx.userId,
+        respondentId: ctx.respondentId,
       }),
     ),
 };

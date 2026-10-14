@@ -87,7 +87,8 @@ export type validateSubmittedFormVersionType = z.infer<typeof validateSubmittedF
 
 export const deleteSubmissionSchema = z.object({
   submissionId: z.string(),
-  userId: z.string(),
+  userId,
+  respondentId,
 });
 
 export type deleteSubmissionSchemaType = z.infer<typeof deleteSubmissionSchema>;

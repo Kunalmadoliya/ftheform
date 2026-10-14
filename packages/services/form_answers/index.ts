@@ -152,7 +152,7 @@ export default class AnswerService {
   public async getAnswersByField(input: GetAnswersByFieldInputType) {
     const { fieldId, userId } = await getAnswersByFieldInputSchema.parseAsync(input);
     const [ownedField] = await db
-      .select({ id: formField.id })
+      .select({ fieldKey: formField.fieldKey })
       .from(formField)
       .innerJoin(form, eq(formField.formId, form.id))
       .where(and(eq(formField.id, fieldId), eq(form.userId, userId)))
@@ -170,7 +170,7 @@ export default class AnswerService {
       })
       .from(answer)
       .innerJoin(submission, eq(answer.submissionId, submission.id))
-      .where(and(eq(answer.fieldId, fieldId), eq(submission.status, "submitted")));
+      .where(and(eq(answer.fieldKey, ownedField.fieldKey), eq(submission.status, "submitted")));
   }
 }
 
