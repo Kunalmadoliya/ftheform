@@ -1,9 +1,10 @@
-import { form, formField, formSnapshot, submission } from "@repo/database/schema";
+import { answer, form, formField, formSnapshot, submission } from "@repo/database/schema";
 import { and, count, db, desc, eq, isNull, sql } from "@repo/database";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
+import { buildSubmissionAnswerRows } from "./answer-rows";
 import {
   validateSubmittedFormVersion,
   type validateSubmittedFormVersionType,
@@ -49,7 +50,12 @@ export default class SubmissionService {
 
   private validateDraftAgainstSnapshot(fieldsJson: unknown, draftAnswer: unknown) {
     const parsedFields = z
-      .array(z.object({ id: z.string(), required: z.boolean(), type: z.string() }))
+      .array(z.object({
+        id: z.string(),
+        fieldKey: z.string(),
+        required: z.boolean(),
+        type: z.string(),
+      }))
       .safeParse(fieldsJson);
     if (!parsedFields.success) throw new Error("Form snapshot fields are invalid");
     const fields = parsedFields.data;
@@ -69,6 +75,7 @@ export default class SubmissionService {
         throw new Error(`Field ${field.id} must be checked`);
       }
     }
+    return { fields, draft };
   }
 
   private async migrateSubmissionToSnapshot(
@@ -440,7 +447,10 @@ export default class SubmissionService {
       if (currentSubmission.snapshotId !== snapshot.id) {
         throw new Error("Submission version is out of date");
       }
-      this.validateDraftAgainstSnapshot(snapshot.fieldsJson, currentSubmission.draftAnswer);
+      const validatedDraft = this.validateDraftAgainstSnapshot(
+        snapshot.fieldsJson,
+        currentSubmission.draftAnswer,
+      );
 
       if (!formSettings.allowMultipleSubmissions) {
         const identityFilters = userId
@@ -472,6 +482,46 @@ export default class SubmissionService {
       if (!submittedResult) throw new Error("Unable to check the form response limit");
       if (submittedResult.submittedCount >= formSettings.responseLimit) {
         throw new Error("This form has reached its response limit");
+      }
+
+      const currentFields = await tx
+        .select({ id: formField.id, fieldKey: formField.fieldKey })
+        .from(formField)
+        .where(eq(formField.formId, existing.formId));
+      const answerRows = buildSubmissionAnswerRows(
+        validatedDraft.fields,
+        validatedDraft.draft,
+        currentFields,
+      );
+      for (const row of answerRows) {
+        const [existingAnswer] = await tx
+          .select({ id: answer.id })
+          .from(answer)
+          .where(and(
+            eq(answer.submissionId, submissionId),
+            eq(answer.fieldKey, row.fieldKey),
+          ))
+          .limit(1)
+          .for("update");
+        if (existingAnswer) {
+          const [updatedAnswer] = await tx
+            .update(answer)
+            .set({ fieldId: row.fieldId, value: row.value })
+            .where(eq(answer.id, existingAnswer.id))
+            .returning({ id: answer.id });
+          if (!updatedAnswer) throw new Error("Failed to update answer");
+        } else {
+          const [createdAnswer] = await tx
+            .insert(answer)
+            .values({
+              submissionId,
+              fieldKey: row.fieldKey,
+              fieldId: row.fieldId,
+              value: row.value,
+            })
+            .returning({ id: answer.id });
+          if (!createdAnswer) throw new Error("Failed to save answer");
+        }
       }
 
       const [updatedSubmission] = await tx

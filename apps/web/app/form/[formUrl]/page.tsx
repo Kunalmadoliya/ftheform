@@ -54,15 +54,12 @@ export default function PublicFormPage() {
   const {
     startSubmissionAsync,
     updateDraftAnswerAsync,
-    saveBulkAnswersAsync,
     submitFormAsync,
     versionQuery,
     isSubmitting,
     isSavingDraft,
-    isSavingAnswers,
     startError,
     submitError,
-    answersError,
   } = useSubmission(formId, submissionId);
   const fields = useMemo(() => getFields(snapshot?.fieldsJson), [snapshot?.fieldsJson]);
 
@@ -154,8 +151,8 @@ export default function PublicFormPage() {
     setInteractionError("");
     try {
       await updateDraftAnswerAsync({ submissionId, draftAnswer: answers });
-      await saveBulkAnswersAsync({ submissionId, answers });
-      await submitFormAsync({ submissionId });
+      const result = await submitFormAsync({ submissionId });
+      setAlreadySubmitted(result.id !== submissionId);
       setSubmitted(true);
     } catch (error) {
       setInteractionError(error instanceof Error ? error.message : "Unable to submit this response.");
@@ -240,7 +237,7 @@ export default function PublicFormPage() {
           const inputType = field.type === "email" || field.type === "number" || field.type === "date" ? field.type : "text";
           return <label className="block space-y-2" key={field.id}><span className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</span><Input type={inputType} required={field.required} value={value == null ? "" : String(value)} onChange={(event) => updateAnswer(field.id, inputType === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value)} /></label>;
         })}
-        {interactionError || startError || submitError || answersError || versionQuery.error || versionQuery.data?.mismatch ? (
+        {interactionError || startError || submitError || versionQuery.error || versionQuery.data?.mismatch ? (
           <p className="text-sm text-destructive" role="alert">
             {interactionError || (versionQuery.data?.mismatch ? "This form has changed. Reload it before submitting." : "Unable to submit this response.")}
           </p>
@@ -250,8 +247,8 @@ export default function PublicFormPage() {
             Start a new response
           </Button>
         ) : null}
-        <Button type="submit" disabled={!submissionId || isSubmitting || isSavingDraft || isSavingAnswers || versionQuery.data?.mismatch}>
-          {isSubmitting || isSavingDraft || isSavingAnswers ? "Submitting..." : "Submit response"}
+        <Button type="submit" disabled={!submissionId || isSubmitting || isSavingDraft || versionQuery.data?.mismatch}>
+          {isSubmitting || isSavingDraft ? "Submitting..." : "Submit response"}
         </Button>
       </form>
     </main>
