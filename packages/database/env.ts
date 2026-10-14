@@ -7,14 +7,16 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().describe("Better Auth Secret"),
   BETTER_AUTH_URL: z.string().default("http://localhost:3000").describe("Better Auth URL"),
 
-  GITHUB_CLIENT_ID: z.string().describe("GitHub Client ID"),
-  GITHUB_CLIENT_SECRET: z.string().describe("GitHub Client Secret"),
+  GITHUB_CLIENT_ID: z.string().min(1).describe("GitHub Client ID"),
+  GITHUB_CLIENT_SECRET: z.string().min(1).describe("GitHub Client Secret"),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(1).optional(),
 
   BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
   WEB_URL: z.string().default("http://localhost:3000").describe("Better Auth URL"),
 
-  GOOGLE_CLIENT_ID: z.string().describe("Google Client ID"),
-  GOOGLE_CLIENT_SECRET: z.string().describe("Google Client Secret"),
+  GOOGLE_CLIENT_ID: z.string().min(1).describe("Google Client ID"),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).describe("Google Client Secret"),
 }).superRefine((values, context) => {
   const databaseUrl =
     values.NODE_ENV === "development" ? values.DEV_DATABASE_URL : values.PROD_DATABASE_URL;

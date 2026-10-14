@@ -2,31 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { GitBranch, Loader2, LockKeyhole, Mail, Sparkles } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
+import { getAuthCallbackUrl, getAuthPageHref, getAuthReturnPath } from "~/lib/auth-redirect";
+
+export { getAuthReturnPath } from "~/lib/auth-redirect";
 
 type AuthMode = "login" | "sign-up";
 
 interface AuthFormProps {
   mode: AuthMode;
-}
-
-export function getAuthReturnPath(value: string | null, origin: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
-    return "/dashboard";
-  }
-  try {
-    const destination = new URL(value, origin);
-    if (destination.origin !== origin) return "/dashboard";
-    return `${destination.pathname}${destination.search}${destination.hash}`;
-  } catch {
-    return "/dashboard";
-  }
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
@@ -36,7 +26,13 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [nextPath, setNextPath] = useState<string | null>(null);
   const isSignUp = mode === "sign-up";
+
+  useEffect(() => {
+    setNextPath(new URLSearchParams(window.location.search).get("next"));
+  }, []);
 
   async function handleEmailAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,8 +40,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsPending(true);
 
     try {
+      const callbackURL = getAuthCallbackUrl(nextPath, window.location.origin);
       const result = isSignUp
-        ? await authClient.signUp.email({ name, email, password })
+        ? await authClient.signUp.email({ name, email, password, callbackURL })
         : await authClient.signIn.email({ email, password });
 
       if (result.error) {
@@ -54,8 +51,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
+      if (isSignUp) {
+        setVerificationSent(true);
+        setIsPending(false);
+        return;
+      }
       const returnPath = getAuthReturnPath(
-        new URLSearchParams(window.location.search).get("next"),
+        nextPath,
         window.location.origin,
       );
       router.replace(returnPath);
@@ -72,10 +74,10 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       const result = await authClient.signIn.social({
         provider,
-        callbackURL: `${window.location.origin}${getAuthReturnPath(
-          new URLSearchParams(window.location.search).get("next"),
+        callbackURL: getAuthCallbackUrl(
+          nextPath,
           window.location.origin,
-        )}`,
+        ),
       });
 
       if (result.error) {
@@ -86,6 +88,24 @@ export function AuthForm({ mode }: AuthFormProps) {
       setError(requestError instanceof Error ? requestError.message : "Unable to connect. Please try again.");
       setIsPending(false);
     }
+  }
+
+  if (verificationSent) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground">
+        <section className="w-full max-w-lg rounded-3xl border border-border bg-card p-8 shadow-xl">
+          <p className="text-sm font-medium text-muted-foreground">One more step</p>
+          <h1 className="mt-2 text-3xl font-semibold">Check your email</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            We sent a verification link to <strong className="text-foreground">{email}</strong>.
+            Verify your email to finish creating your account.
+          </p>
+          <Link className="mt-6 inline-block font-medium underline underline-offset-4" href={getAuthPageHref("/login", nextPath)}>
+            Return to sign in
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -170,7 +190,10 @@ export function AuthForm({ mode }: AuthFormProps) {
 
             <p className="mt-7 text-center text-sm text-muted-foreground">
               {isSignUp ? "Already have an account?" : "New to FTHEFORM?"}{" "}
-              <Link className="font-medium text-foreground underline underline-offset-4" href={isSignUp ? "/login" : "/sign-up"}>
+              <Link
+                className="font-medium text-foreground underline underline-offset-4"
+                href={getAuthPageHref(isSignUp ? "/login" : "/sign-up", nextPath)}
+              >
                 {isSignUp ? "Log in" : "Create an account"}
               </Link>
             </p>

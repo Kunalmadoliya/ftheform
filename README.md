@@ -33,7 +33,7 @@ pnpm db:up
 pnpm db:migrate
 ```
 
-Configure `DEV_DATABASE_URL` for the API running on the host (`localhost:5432`) and `PROD_DATABASE_URL` for the API and migrations running in Compose (the `postgresdb` service hostname). `NODE_ENV` must be `development` or `production`; the database package selects and validates the matching URL. The API also needs Better Auth secrets and provider credentials, `BASE_URL`, and `WEB_URL`. The web needs `NEXT_PUBLIC_API_URL`.
+Configure `DEV_DATABASE_URL` for the API running on the host (`localhost:5432`) and `PROD_DATABASE_URL` for the API and migrations running in Compose (the `postgresdb` service hostname). `NODE_ENV` must be `development` or `production`; the database package selects and validates the matching URL. The API also needs Better Auth secrets and provider credentials, `BASE_URL`, `WEB_URL`, `RESEND_API_KEY`, and `EMAIL_FROM` so it can send required email-verification links. The web needs `NEXT_PUBLIC_API_URL`.
 
 Set `RESPONDENT_COOKIE_SECRET` to a separate random value of at least 32 characters; it signs respondent identity cookies and must be shared by every API instance. Prefer hosting the web app and API under the same site (for example, `forms.example.com` and `api.example.com`): the respondent cookie can then use `SameSite=Lax`. When the web and API are on different sites, production uses `SameSite=None; Secure`, which requires HTTPS and may be restricted by browser third-party-cookie policies.
 

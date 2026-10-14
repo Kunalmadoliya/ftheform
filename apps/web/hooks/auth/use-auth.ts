@@ -1,5 +1,6 @@
 import { trpc } from "~/trpc/client";
 import { authClient } from "~/lib/auth-client";
+import { getAuthCallbackUrl } from "~/lib/auth-redirect";
 
 export function useSignin() {
   const {
@@ -57,7 +58,10 @@ export function useGoogleSignIn() {
   const googleSignIn = () =>
     authClient.signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: getAuthCallbackUrl(
+        new URLSearchParams(window.location.search).get("next"),
+        window.location.origin,
+      ),
     });
 
   return { googleSignIn };
@@ -67,7 +71,10 @@ export function useGithubSignIn() {
   const githubSignIn = () =>
     authClient.signIn.social({
       provider: "github",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: getAuthCallbackUrl(
+        new URLSearchParams(window.location.search).get("next"),
+        window.location.origin,
+      ),
     });
 
   return { githubSignIn };
