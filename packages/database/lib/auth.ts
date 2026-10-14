@@ -8,7 +8,7 @@ import { db } from "../index";
 
 export const auth = betterAuth({
   baseURL: env.BASE_URL,
-  trustedOrigins: [env.WEB_URL],
+  trustedOrigins: env.TRUSTED_ORIGINS?.length ? env.TRUSTED_ORIGINS : [env.WEB_URL],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

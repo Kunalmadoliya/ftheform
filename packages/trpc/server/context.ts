@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { auth } from "@repo/database/lib/auth";
+import { fromNodeHeaders } from "better-auth/node";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getDomain } from "tldts";
 
@@ -78,7 +79,7 @@ export async function createContext({
   res,
 }: CreateExpressContextOptions): Promise<ContextUser> {
   const authSession = await auth.api.getSession({
-    headers: new Headers(req.headers as Record<string, string>),
+    headers: fromNodeHeaders(req.headers),
   });
   const userId = authSession?.user.id ?? null;
   const respondentId = readRespondentId(req.headers.cookie);

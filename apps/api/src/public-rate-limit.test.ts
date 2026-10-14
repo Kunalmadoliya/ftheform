@@ -1,6 +1,10 @@
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
-import { createPublicProcedureRateLimit, isPublicRateLimitedPath } from "./public-rate-limit";
+import {
+  createPublicProcedureRateLimit,
+  isPublicOpenApiRateLimitedRequest,
+  isPublicRateLimitedPath,
+} from "./public-rate-limit";
 
 describe("public procedure rate limiting", () => {
   let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
@@ -17,6 +21,9 @@ describe("public procedure rate limiting", () => {
     expect(isPublicRateLimitedPath("/submission.startSubmission")).toBe(true);
     expect(isPublicRateLimitedPath("submission.submitForm,form.incrementFormViewCount")).toBe(true);
     expect(isPublicRateLimitedPath("form.getById")).toBe(false);
+    expect(isPublicOpenApiRateLimitedRequest("POST", "/submission/id/submit")).toBe(true);
+    expect(isPublicOpenApiRateLimitedRequest("GET", "/form/id/snapshots/latest")).toBe(true);
+    expect(isPublicOpenApiRateLimitedRequest("GET", "/form/id")).toBe(false);
   });
 
   it("limits concurrent public requests from the same client", async () => {
@@ -33,5 +40,20 @@ describe("public procedure rate limiting", () => {
     );
     expect(responses.filter((response) => response.status === 200)).toHaveLength(2);
     expect(responses.filter((response) => response.status === 429)).toHaveLength(3);
+  });
+
+  it("limits public OpenAPI endpoints", async () => {
+    const app = express();
+    app.use("/api", createPublicProcedureRateLimit({ limit: 1, windowMs: 60_000 }));
+    app.use("/api", (_req, res) => res.sendStatus(200));
+    server = app.listen(0);
+    await new Promise<void>((resolve) => server?.once("listening", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind to a TCP port");
+
+    const first = await fetch(`http://127.0.0.1:${address.port}/api/submission/id/submit`, { method: "POST" });
+    const second = await fetch(`http://127.0.0.1:${address.port}/api/submission/id/submit`, { method: "POST" });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
   });
 });

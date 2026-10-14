@@ -17,10 +17,31 @@ const publicProcedures = new Set([
   "answer.saveBulkAnswers",
 ]);
 
+const publicOpenApiRoutes: Array<{ method: string; path: RegExp }> = [
+  { method: "GET", path: /^\/form\/public\/[^/]+$/ },
+  { method: "POST", path: /^\/form\/[^/]+\/view$/ },
+  { method: "GET", path: /^\/form\/[^/]+\/snapshots\/latest$/ },
+  { method: "POST", path: /^\/submission\/start$/ },
+  { method: "GET", path: /^\/submission\/active\/[^/]+$/ },
+  { method: "PATCH", path: /^\/submission\/[^/]+\/draft$/ },
+  { method: "PATCH", path: /^\/submission\/[^/]+\/activity$/ },
+  { method: "POST", path: /^\/submission\/[^/]+\/submit$/ },
+  { method: "POST", path: /^\/submission\/[^/]+\/not-submitted$/ },
+  { method: "GET", path: /^\/submission\/[^/]+\/version$/ },
+  { method: "DELETE", path: /^\/submission\/[^/]+$/ },
+  { method: "POST", path: /^\/answer\/?$/ },
+  { method: "PUT", path: /^\/answer\/bulk$/ },
+];
+
 export function isPublicRateLimitedPath(path: string) {
   return path
     .split(",")
     .some((procedure) => publicProcedures.has(procedure.replace(/^\/+/, "").split("?")[0] ?? ""));
+}
+
+export function isPublicOpenApiRateLimitedRequest(method: string, path: string) {
+  const normalizedPath = path.split("?")[0]?.replace(/\/+$/, "") || "/";
+  return publicOpenApiRoutes.some((route) => route.method === method && route.path.test(normalizedPath));
 }
 
 export function createPublicProcedureRateLimit(options?: { limit?: number; windowMs?: number }) {
@@ -32,7 +53,10 @@ export function createPublicProcedureRateLimit(options?: { limit?: number; windo
   });
 
   return (req: Request, res: Response, next: NextFunction) => {
-    if (isPublicRateLimitedPath(req.path)) return limiter(req, res, next);
+    const isRateLimited = req.baseUrl === "/api"
+      ? isPublicOpenApiRateLimitedRequest(req.method, req.path)
+      : isPublicRateLimitedPath(req.path);
+    if (isRateLimited) return limiter(req, res, next);
     return next();
   };
 }

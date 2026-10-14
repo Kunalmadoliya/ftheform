@@ -32,7 +32,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 
 app.use(
   cors({
-    origin: env.NODE_ENV === "production" ? env.WEB_URL : "http://localhost:3000",
+    origin: env.CORS_ORIGINS?.length ? env.CORS_ORIGINS : [env.WEB_URL],
     credentials: true,
   }),
 );
@@ -57,11 +57,11 @@ app.use(
 );
 
 app.get("/", (req, res) => {
-  return res.json({ message: "Streamyst is up and running..." });
+  return res.json({ message: "FTHEFORM API is up and running." });
 });
 
 app.get("/health", (req, res) => {
-  return res.json({ message: "Streamyst server is healthy", healthy: true });
+  return res.json({ message: "FTHEFORM API is healthy.", healthy: true });
 });
 
 app.get("/api/me", async (req, res) => {
@@ -77,10 +77,15 @@ app.get("/openapi.json", (req, res) => {
 });
 
 logger.debug(`docs: ${env.BASE_URL}/docs`);
-app.use("/docs", apiReference({ url: "/openapi.json" }));
+if (env.NODE_ENV === "development") {
+  app.use("/docs", apiReference({ url: "/openapi.json" }));
+} else {
+  app.use("/docs", (_req, res) => res.sendStatus(404));
+}
 
 app.use(
   "/api",
+  createPublicProcedureRateLimit(),
   createOpenApiExpressMiddleware({
     router: serverRouter,
     createContext,
