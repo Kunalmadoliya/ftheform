@@ -1,5 +1,5 @@
 FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /repo
 
 FROM base AS pruner
