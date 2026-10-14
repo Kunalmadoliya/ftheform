@@ -1,5 +1,5 @@
 import { answer, form, formField, formSnapshot, submission } from "@repo/database/schema";
-import { and, count, db, desc, eq, isNull, or, sql } from "@repo/database";
+import { and, count, db, desc, eq, isNull, lt, or, sql } from "@repo/database";
 import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
@@ -600,6 +600,16 @@ export default class SubmissionService {
       .returning();
     if (!updatedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to mark submission as not submitted");
     return updatedSubmission;
+  }
+
+  public async markInactiveSubmissionsNotSubmitted() {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const expired = await db
+      .update(submission)
+      .set({ status: "not_submitted" })
+      .where(and(eq(submission.status, "filling"), lt(submission.lastActivity, cutoff)))
+      .returning({ id: submission.id });
+    return { count: expired.length };
   }
 
   public async deleteSubmission(input: deleteSubmissionSchemaType) {

@@ -52,6 +52,7 @@ export default function PublicFormPage() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [interactionError, setInteractionError] = useState("");
   const autosaveTimer = useRef<number | undefined>(undefined);
+  const viewAttemptedFor = useRef("");
   const {
     startSubmissionAsync,
     updateDraftAnswerAsync,
@@ -65,12 +66,9 @@ export default function PublicFormPage() {
   const fields = useMemo(() => getFields(snapshot?.fieldsJson), [snapshot?.fieldsJson]);
 
   useEffect(() => {
-    if (!formId || !form) return;
-    const viewKey = `form-viewed:${formId}`;
-    if (window.localStorage.getItem(viewKey)) return;
-    window.localStorage.setItem(viewKey, "1");
+    if (!formId || !form || viewAttemptedFor.current === formId) return;
+    viewAttemptedFor.current = formId;
     void incrementViewAsync({ formId }).catch(() => {
-      window.localStorage.removeItem(viewKey);
       toast.error("Unable to record this form view.");
     });
   }, [form, formId, incrementViewAsync]);

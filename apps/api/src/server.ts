@@ -2,6 +2,7 @@ import express from "express";
 import { logger } from "@repo/logger";
 import { auth } from "@repo/database/lib/auth";
 import cors from "cors";
+import helmet from "helmet";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 
 import * as trpcExpress from "@trpc/server/adapters/express";
@@ -11,11 +12,14 @@ import { apiReference } from "@scalar/express-api-reference";
 import { serverRouter, createContext } from "@repo/trpc/server";
 import { serve as serveInngest } from "inngest/express";
 import { generateFormFieldsFunction } from "@repo/services/form_ai/functions";
+import { expireInactiveSubmissionsFunction } from "@repo/services/form_submission/functions";
 import { inngest } from "@repo/services/form_ai/inngest-client";
+import { createPublicProcedureRateLimit } from "./public-rate-limit";
 
 import { env } from "./env";
 
 export const app = express();
+app.use(helmet());
 const openApiDocument = generateOpenApiDocument(serverRouter, {
   title: "FTHEFORM",
   version: "1.0.0",
@@ -34,10 +38,13 @@ app.use(
 app.all("/api/auth/{*splat}", toNodeHandler(auth));
 
 // JSON parser for every other route, after the auth handler
-app.use(express.json());
+app.use(express.json({ limit: "256kb" }));
 app.use(
   "/api/inngest",
-  serveInngest({ client: inngest, functions: [generateFormFieldsFunction] }),
+  serveInngest({
+    client: inngest,
+    functions: [generateFormFieldsFunction, expireInactiveSubmissionsFunction],
+  }),
 );
 
 app.get("/", (req, res) => {
@@ -73,6 +80,7 @@ app.use(
 
 app.use(
   "/trpc",
+  createPublicProcedureRateLimit(),
   trpcExpress.createExpressMiddleware({
     router: serverRouter,
     createContext,

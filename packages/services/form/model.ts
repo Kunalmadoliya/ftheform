@@ -86,6 +86,7 @@ export type UpdateResponseLimitType = UpdateFormResponseLimitType;
 
 export const incrementFormViewCount = z.object({
   formId: z.string().describe("form id"),
+  respondentId: z.string().uuid().describe("validated respondent cookie id"),
 });
 
 export type IncrementFormViewCountType = z.infer<typeof incrementFormViewCount>;

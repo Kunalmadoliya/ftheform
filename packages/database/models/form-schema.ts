@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   index,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "../auth-schema";
@@ -67,6 +68,21 @@ export const formSnapshot = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [index("form_snapshot_idx").on(table.formId)],
+);
+
+export const formView = pgTable(
+  "form_view",
+  {
+    id: uuid("form_view_id").primaryKey().defaultRandom(),
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => form.id, { onDelete: "cascade" }),
+    respondentId: text("respondent_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("form_view_form_respondent_idx").on(table.formId, table.respondentId),
+  ],
 );
 
 export const formField = pgTable(

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { protectedProcedure, publicProcedure } from "../../trpc";
 import {
   createInitialFormInput,
@@ -87,7 +88,10 @@ export const formRouter = {
     })
     .input(getFormByIdInput)
     .output(getPublicFormByIdOutput)
-    .query(({ ctx, input }) => formServiceInstance.getPublicFormById(input, ctx.userId)),
+    .query(({ ctx, input }) => {
+      if (!ctx.respondentId) ctx.setRespondentCookie(randomUUID());
+      return formServiceInstance.getPublicFormById(input, ctx.userId);
+    }),
 
   renameForm: protectedProcedure
     .meta({
@@ -223,7 +227,11 @@ export const formRouter = {
     })
     .input(incrementFormViewCountInput)
     .output(incrementFormViewCountOutput)
-    .mutation(({ input }) => formServiceInstance.incrementFormViewCount(input)),
+    .mutation(({ ctx, input }) => {
+      const respondentId = ctx.respondentId ?? randomUUID();
+      if (!ctx.respondentId) ctx.setRespondentCookie(respondentId);
+      return formServiceInstance.incrementFormViewCount({ ...input, respondentId });
+    }),
 
   publishForm: protectedProcedure
     .meta({

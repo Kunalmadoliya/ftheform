@@ -27,7 +27,7 @@ import {
   unpublishForm,
   type UnpublishFormType,
 } from "./model";
-import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
+import { form, formField, formSnapshot, formView } from "@repo/database/models/form-schema";
 import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
@@ -222,23 +222,42 @@ export default class FormService {
   }
 
   public async incrementFormViewCount(input: IncrementFormViewCountType) {
-    const { formId } = await incrementFormViewCount.parseAsync(input);
-    const [updatedForm] = await db
-      .update(form)
-      .set({ views: sql`${form.views} + 1` })
-      .where(and(
-        eq(form.id, formId),
-        eq(form.isPublished, true),
-        eq(form.isArchived, false),
-        isNotNull(form.userId),
-      ))
-      .returning({ id: form.id, views: form.views });
+    const { formId, respondentId } = await incrementFormViewCount.parseAsync(input);
+    return db.transaction(async (tx) => {
+      const [publicForm] = await tx
+        .select({ id: form.id, views: form.views })
+        .from(form)
+        .where(and(
+          eq(form.id, formId),
+          eq(form.isPublished, true),
+          eq(form.isArchived, false),
+          isNotNull(form.userId),
+        ))
+        .for("share");
+      if (!publicForm) throw serviceError("NOT_FOUND", "Form not found");
 
-    if (!updatedForm) {
-      throw serviceError("NOT_FOUND", "Form not found");
-    }
+      const [newView] = await tx
+        .insert(formView)
+        .values({ formId, respondentId })
+        .onConflictDoNothing()
+        .returning({ id: formView.id });
+      if (!newView) {
+        const [currentForm] = await tx
+          .select({ id: form.id, views: form.views })
+          .from(form)
+          .where(eq(form.id, formId));
+        if (!currentForm) throw serviceError("NOT_FOUND", "Form not found");
+        return currentForm;
+      }
 
-    return updatedForm;
+      const [updatedForm] = await tx
+        .update(form)
+        .set({ views: sql`${form.views} + 1` })
+        .where(eq(form.id, formId))
+        .returning({ id: form.id, views: form.views });
+      if (!updatedForm) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to count this form view");
+      return updatedForm;
+    });
   }
 
   public async publishForm(input: PublishFormType) {
