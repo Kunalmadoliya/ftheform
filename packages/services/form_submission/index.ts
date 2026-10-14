@@ -1,9 +1,9 @@
 import { answer, form, formField, formSnapshot, submission } from "@repo/database/schema";
 import { and, count, db, desc, eq, isNull, sql } from "@repo/database";
-import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
+import { validateSnapshotDraft } from "./draft-validation";
 import { buildSubmissionAnswerRows } from "./answer-rows";
 import {
   validateSubmittedFormVersion,
@@ -46,36 +46,6 @@ export default class SubmissionService {
     for (const key of [...new Set(keys)].sort()) {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
     }
-  }
-
-  private validateDraftAgainstSnapshot(fieldsJson: unknown, draftAnswer: unknown) {
-    const parsedFields = z
-      .array(z.object({
-        id: z.string(),
-        fieldKey: z.string(),
-        required: z.boolean(),
-        type: z.string(),
-      }))
-      .safeParse(fieldsJson);
-    if (!parsedFields.success) throw new Error("Form snapshot fields are invalid");
-    const fields = parsedFields.data;
-    const draft = draftAnswer && typeof draftAnswer === "object" && !Array.isArray(draftAnswer)
-      ? draftAnswer as Record<string, unknown>
-      : {};
-    const fieldIds = new Set(fields.map((field) => field.id));
-
-    if (Object.keys(draft).some((fieldId) => !fieldIds.has(fieldId))) {
-      throw new Error("Draft contains an invalid field");
-    }
-    for (const field of fields) {
-      const value = draft[field.id];
-      const empty = value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
-      if (field.required && empty) throw new Error(`Field ${field.id} is required`);
-      if (field.required && field.type === "checkbox" && value !== true) {
-        throw new Error(`Field ${field.id} must be checked`);
-      }
-    }
-    return { fields, draft };
   }
 
   private async migrateSubmissionToSnapshot(
@@ -350,23 +320,50 @@ export default class SubmissionService {
 
   public async updateDraftAnswer(input: updateDraftAnswerSchemaType) {
     const { submissionId, draftAnswer, userId, respondentId } = await updateDraftAnswerSchema.parseAsync(input);
-    const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
-    if (existing.status !== "filling") throw new Error("Submission is already finalized");
+    return db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          submissionRecord: submission,
+          accessPolicy: form.accessPolicy,
+          ownerId: form.userId,
+          isArchived: form.isArchived,
+        })
+        .from(submission)
+        .innerJoin(form, eq(submission.formId, form.id))
+        .where(and(eq(submission.id, submissionId), this.respondentCondition(userId, respondentId)))
+        .limit(1)
+        .for("update");
+      if (!existing) throw new Error("Submission not found");
+      if (existing.isArchived || !existing.ownerId) throw new Error("Form is archived");
+      assertFormAccess(existing.accessPolicy, userId);
+      if (existing.submissionRecord.status !== "filling") {
+        throw new Error("Submission is already finalized");
+      }
 
-    const currentDraft = existing.draftAnswer && typeof existing.draftAnswer === "object" && !Array.isArray(existing.draftAnswer)
-      ? existing.draftAnswer as Record<string, unknown>
-      : {};
-    const [updatedSubmission] = await db
-      .update(submission)
-      .set({ draftAnswer: { ...currentDraft, ...draftAnswer }, lastActivity: new Date() })
-      .where(and(
-        eq(submission.id, submissionId),
-        eq(submission.status, "filling"),
-        this.respondentCondition(userId, respondentId),
-      ))
-      .returning();
-    if (!updatedSubmission) throw new Error("Submission not found");
-    return updatedSubmission;
+      const [snapshot] = await tx
+        .select()
+        .from(formSnapshot)
+        .where(eq(formSnapshot.id, existing.submissionRecord.snapshotId))
+        .limit(1);
+      if (!snapshot) throw new Error("Form snapshot not found");
+      const currentDraft = existing.submissionRecord.draftAnswer &&
+        typeof existing.submissionRecord.draftAnswer === "object" &&
+        !Array.isArray(existing.submissionRecord.draftAnswer)
+        ? existing.submissionRecord.draftAnswer as Record<string, unknown>
+        : {};
+      const validatedDraft = validateSnapshotDraft(
+        snapshot.fieldsJson,
+        { ...currentDraft, ...draftAnswer },
+        { requireRequired: false },
+      );
+      const [updatedSubmission] = await tx
+        .update(submission)
+        .set({ draftAnswer: validatedDraft.draft, lastActivity: new Date() })
+        .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
+        .returning();
+      if (!updatedSubmission) throw new Error("Submission not found");
+      return updatedSubmission;
+    });
   }
 
   public async updateLastActivity(input: updateLastActivitySchemaType) {
@@ -447,9 +444,10 @@ export default class SubmissionService {
       if (currentSubmission.snapshotId !== snapshot.id) {
         throw new Error("Submission version is out of date");
       }
-      const validatedDraft = this.validateDraftAgainstSnapshot(
+      const validatedDraft = validateSnapshotDraft(
         snapshot.fieldsJson,
         currentSubmission.draftAnswer,
+        { requireRequired: true },
       );
 
       if (!formSettings.allowMultipleSubmissions) {

@@ -12,8 +12,8 @@ import {
   type SaveAnswerInputType,
   type saveFormAnswerInputType,
 } from "./model";
-import { z } from "zod";
 import { assertFormAccess } from "../form/access";
+import { validateSnapshotDraft } from "../form_submission/draft-validation";
 
 export default class AnswerService {
   public async saveAnswer(input: SaveAnswerInputType) {
@@ -73,11 +73,12 @@ export default class AnswerService {
         .limit(1);
       if (!snapshot) throw new Error("Form snapshot not found");
 
-      const snapshotFields = z
-        .array(z.object({ id: z.string(), fieldKey: z.string() }))
-        .safeParse(snapshot.fieldsJson);
-      if (!snapshotFields.success) throw new Error("Form snapshot fields are invalid");
-      const fieldsById = new Map(snapshotFields.data.map((field) => [field.id, field]));
+      const validatedAnswers = validateSnapshotDraft(
+        snapshot.fieldsJson,
+        answers,
+        { requireRequired: false },
+      );
+      const fieldsById = new Map(validatedAnswers.fields.map((field) => [field.id, field]));
       const requestedFieldIds = Object.keys(answers);
       if (requestedFieldIds.some((fieldId) => !fieldsById.has(fieldId))) {
         throw new Error("Answer contains a field that is not in the submission snapshot");
