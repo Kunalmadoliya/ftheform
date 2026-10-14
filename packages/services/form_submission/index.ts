@@ -1,8 +1,9 @@
-import { form, formSnapshot, submission } from "@repo/database/schema";
+import { form, formField, formSnapshot, submission } from "@repo/database/schema";
 import { and, count, db, desc, eq, isNull, sql } from "@repo/database";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
+import { migrateDraftAnswers } from "../form/snapshot-utils";
 import {
   validateSubmittedFormVersion,
   type validateSubmittedFormVersionType,
@@ -68,6 +69,31 @@ export default class SubmissionService {
         throw new Error(`Field ${field.id} must be checked`);
       }
     }
+  }
+
+  private async migrateSubmissionToSnapshot(
+    tx: Pick<typeof db, "select" | "update">,
+    currentSubmission: typeof submission.$inferSelect,
+    snapshot: typeof formSnapshot.$inferSelect,
+  ) {
+    if (currentSubmission.snapshotId === snapshot.id) return currentSubmission;
+
+    const [oldSnapshot] = await tx
+      .select({ fieldsJson: formSnapshot.fieldsJson })
+      .from(formSnapshot)
+      .where(eq(formSnapshot.id, currentSubmission.snapshotId));
+    const migratedDraft = migrateDraftAnswers(
+      oldSnapshot?.fieldsJson,
+      snapshot.fieldsJson,
+      currentSubmission.draftAnswer,
+    );
+    const [migratedSubmission] = await tx
+      .update(submission)
+      .set({ snapshotId: snapshot.id, draftAnswer: migratedDraft, lastActivity: new Date() })
+      .where(and(eq(submission.id, currentSubmission.id), eq(submission.status, "filling")))
+      .returning();
+    if (!migratedSubmission) throw new Error("Unable to migrate the active response");
+    return migratedSubmission;
   }
 
   private async validateFormVersion(input: validateSubmittedFormVersionType) {
@@ -202,7 +228,10 @@ export default class SubmissionService {
         .where(and(eq(submission.formId, formId), eq(submission.status, "filling"), activeIdentity))
         .orderBy(desc(submission.lastActivity))
         .limit(1);
-      if (activeSubmission) return { outcome: "started" as const, submission: activeSubmission };
+      if (activeSubmission) {
+        const migratedSubmission = await this.migrateSubmissionToSnapshot(tx, activeSubmission, snapshot);
+        return { outcome: "started" as const, submission: migratedSubmission };
+      }
 
       if (userId && respondentId && currentForm.accessPolicy !== "anonymous_only") {
         const [anonymousDraft] = await tx
@@ -219,10 +248,11 @@ export default class SubmissionService {
           .orderBy(desc(submission.lastActivity))
           .limit(1);
         if (anonymousDraft) {
+          const migratedDraft = await this.migrateSubmissionToSnapshot(tx, anonymousDraft, snapshot);
           const [adoptedDraft] = await tx
             .update(submission)
             .set({ userId, respondentId: null, lastActivity: new Date() })
-            .where(and(eq(submission.id, anonymousDraft.id), eq(submission.status, "filling")))
+            .where(and(eq(submission.id, migratedDraft.id), eq(submission.status, "filling")))
             .returning();
           if (!adoptedDraft) throw new Error("Unable to resume the anonymous response");
           return { outcome: "started" as const, submission: adoptedDraft };

@@ -27,10 +27,11 @@ import {
   unpublishForm,
   type UnpublishFormType,
 } from "./model";
-import { form } from "@repo/database/models/form-schema";
+import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
 import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
+import { fieldSetHash } from "./snapshot-utils";
 
 const formSnapshotService = new FormSnapshotService();
 
@@ -244,7 +245,11 @@ export default class FormService {
 
     return db.transaction(async (tx) => {
       const [currentForm] = await tx
-        .select({ title: form.title, isArchived: form.isArchived })
+        .select({
+          title: form.title,
+          isArchived: form.isArchived,
+          currentVersion: form.currentVersion,
+        })
         .from(form)
         .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
@@ -253,6 +258,22 @@ export default class FormService {
       }
       if (currentForm.isArchived) throw new Error("Archived forms cannot be published");
 
+      const currentFields = await tx
+        .select()
+        .from(formField)
+        .where(eq(formField.formId, formId))
+        .orderBy(formField.fieldOrder);
+      const [currentSnapshot] = await tx
+        .select({ fieldsJson: formSnapshot.fieldsJson })
+        .from(formSnapshot)
+        .where(and(
+          eq(formSnapshot.formId, formId),
+          eq(formSnapshot.versions, currentForm.currentVersion),
+        ))
+        .orderBy(desc(formSnapshot.createdAt))
+        .limit(1);
+      const unchanged = currentSnapshot !== undefined &&
+        fieldSetHash(currentFields) === fieldSetHash(currentSnapshot.fieldsJson);
       const slug = currentForm.title.trim().replace(/\s+/g, "-").toLowerCase();
       const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
       const [updatedForm] = await tx
@@ -260,7 +281,9 @@ export default class FormService {
         .set({
           formUrl: publishFormURL,
           isPublished: true,
-          currentVersion: sql<number>`${form.currentVersion} + 1`,
+          currentVersion: unchanged
+            ? form.currentVersion
+            : sql<number>`${form.currentVersion} + 1`,
         })
         .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
         .returning({ ...this.formSelection(), currentVersion: form.currentVersion });
@@ -269,13 +292,15 @@ export default class FormService {
         throw new Error("Form not found");
       }
 
-      await formSnapshotService.createSnapshot(
-        {
-          formId,
-          version: updatedForm.currentVersion,
-        },
-        tx,
-      );
+      if (!unchanged) {
+        await formSnapshotService.createSnapshot(
+          {
+            formId,
+            version: updatedForm.currentVersion,
+          },
+          tx,
+        );
+      }
 
       const { currentVersion: _currentVersion, ...publishedForm } = updatedForm;
       return publishedForm;
