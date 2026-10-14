@@ -18,6 +18,7 @@ import { useForm } from "~/hooks/form/use-form";
 import { authClient } from "~/lib/auth-client";
 import Link from "next/link";
 import { useSubmissionsAcrossForms } from "~/hooks/form/use-submissions-across-forms";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean }) {
   const router = useRouter();
@@ -44,7 +45,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
       await updateFormDescriptionAsync({ formId: editingFormId, description: description || null });
       setDialog(null);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to save the form.");
+      setError(getTrpcErrorMessage(submitError, "Unable to save the form."));
     }
   }
 
@@ -54,7 +55,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
       const form = await createFormAsync({ title: "Untitled Form" });
       router.push(`/forms/${form.id}/builder`);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Unable to create the form.");
+      setError(getTrpcErrorMessage(createError, "Unable to create the form."));
     }
   }
 
@@ -63,7 +64,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
     try {
       await deleteFormAsync({ formId });
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete the form.");
+      setError(getTrpcErrorMessage(deleteError, "Unable to delete the form."));
     }
   }
 
@@ -71,7 +72,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
     try {
       await publishFormAsync({ formId });
     } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : "Unable to publish the form.");
+      setError(getTrpcErrorMessage(publishError, "Unable to publish the form."));
     }
   }
 
@@ -79,7 +80,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
     try {
       await unpublishFormAsync({ formId });
     } catch (unpublishError) {
-      setError(unpublishError instanceof Error ? unpublishError.message : "Unable to unpublish the form.");
+      setError(getTrpcErrorMessage(unpublishError, "Unable to unpublish the form."));
     }
   }
 

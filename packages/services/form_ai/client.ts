@@ -1,11 +1,12 @@
 import OpenAI from "openai";
+import { serviceError } from "../errors";
 
 let client: OpenAI | undefined;
 
 export function getOpenAiClient() {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("AI form generation is not configured: OPENAI_API_KEY is missing.");
+    throw serviceError("INTERNAL_SERVER_ERROR", "AI form generation is not configured.");
   }
 
   client ??= new OpenAI({

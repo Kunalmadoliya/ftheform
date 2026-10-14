@@ -11,6 +11,7 @@ import {
 import { formSnapshot, form, formField } from "@repo/database/models/form-schema";
 import { and, asc, db, desc, eq } from "@repo/database";
 import { assertFormAccess } from "../form/access";
+import { serviceError } from "../errors";
 
 type SnapshotTransaction = Pick<typeof db, "select" | "insert">;
 
@@ -32,11 +33,11 @@ export default class FormSnapshotService {
       .limit(1);
 
     if (!checkForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
-    if (checkForm.isArchived || !checkForm.ownerId) throw new Error("Form is archived");
-    if (!checkForm.isPublished) throw new Error("Form is not published");
-    if (!checkForm.isOpen) throw new Error("Form is closed");
+    if (checkForm.isArchived || !checkForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+    if (!checkForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
+    if (!checkForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
     assertFormAccess(checkForm.accessPolicy, userId);
 
     const [snapshot] = await db
@@ -46,7 +47,7 @@ export default class FormSnapshotService {
       .orderBy(desc(formSnapshot.createdAt))
       .limit(1);
 
-    if (!snapshot) throw new Error("Form snapshot not found");
+    if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
     return snapshot;
   }
 
@@ -58,7 +59,7 @@ export default class FormSnapshotService {
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId)))
       .limit(1);
-    if (!ownedForm) throw new Error("Form not found");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
     const [checkFormSnapshot] = await db
       .select()
@@ -68,7 +69,7 @@ export default class FormSnapshotService {
       .limit(1);
 
     if (!checkFormSnapshot) {
-      throw new Error("Form snapshot not found");
+      throw serviceError("NOT_FOUND", "Form snapshot not found");
     }
 
     return checkFormSnapshot;
@@ -93,7 +94,7 @@ export default class FormSnapshotService {
       .insert(formSnapshot)
       .values({ formId, versions: version, fieldsJson: fields })
       .returning();
-    if (!snapshot) throw new Error("Failed to create form snapshot");
+    if (!snapshot) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to create form snapshot");
     return snapshot;
   }
 
@@ -104,7 +105,7 @@ export default class FormSnapshotService {
       .select({ id: form.id })
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
-    if (!ownedForm) throw new Error("Form not found");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
     return db
       .select()

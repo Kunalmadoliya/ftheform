@@ -1,3 +1,4 @@
+import { NonRetriableError } from "inngest";
 import { inngest } from "./inngest-client";
 import { formAiServiceInstance, safeGenerationError } from "./index";
 
@@ -16,7 +17,7 @@ export const generateFormFieldsFunction = inngest.createFunction(
       formAiServiceInstance.getJobForProcessing(event.data.jobId),
     );
     if (job.status === "completed") return { status: "completed" };
-    if (job.status === "failed") throw new Error("Form generation job has failed");
+    if (job.status === "failed") throw new NonRetriableError("Form generation job has failed");
 
     await step.run("mark-generation-running", () =>
       formAiServiceInstance.markRunning(job.id),

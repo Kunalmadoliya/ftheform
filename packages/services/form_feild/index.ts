@@ -13,6 +13,7 @@ import {
 } from "./model";
 import { form, formField } from "@repo/database/models/form-schema";
 import { generatedFieldConfigSchema, type GeneratedFormField } from "../form_ai/model";
+import { serviceError } from "../errors";
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -22,7 +23,7 @@ export default class FormFieldService {
       .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
 
     if (!owns) {
-      throw new Error("Form not found or does not belong to the user");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
   }
 
@@ -58,7 +59,7 @@ export default class FormFieldService {
         .returning();
 
       if (!newField) {
-        throw new Error("Form field creation failed");
+        throw serviceError("INTERNAL_SERVER_ERROR", "Form field creation failed");
       }
       return newField;
     });
@@ -74,13 +75,13 @@ export default class FormFieldService {
       .select({ id: form.id })
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
-    if (!ownedForm) throw new Error("Form not found");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
     const [orderResult] = await tx
       .select({ maxOrder: sql<number>`max(${formField.fieldOrder})` })
       .from(formField)
       .where(eq(formField.formId, formId));
-    if (!orderResult) throw new Error("Unable to determine the next form field order");
+    if (!orderResult) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to determine form field order");
 
     const startingOrder = (orderResult.maxOrder ?? -1) + 1;
     const createdFields = await tx
@@ -99,7 +100,7 @@ export default class FormFieldService {
       .returning();
 
     if (createdFields.length !== fields.length) {
-      throw new Error("Generated form fields were not all persisted");
+      throw serviceError("INTERNAL_SERVER_ERROR", "Generated form fields were not all persisted");
     }
     return createdFields;
   }
@@ -117,7 +118,7 @@ export default class FormFieldService {
         .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))
         .for("update");
       if (!currentField) {
-        throw new Error("Form field not found");
+        throw serviceError("NOT_FOUND", "Form field not found");
       }
       const nextConfig = config === undefined ? currentField.config ?? undefined : config;
       const validatedField = generatedFieldConfigSchema.parse({
@@ -141,7 +142,7 @@ export default class FormFieldService {
         .returning();
 
       if (!updatedFormField) {
-        throw new Error("Form field not found");
+        throw serviceError("NOT_FOUND", "Form field not found");
       }
 
       return updatedFormField;
@@ -167,7 +168,7 @@ export default class FormFieldService {
         incomingIds.size !== existingIds.size ||
         orderedFieldIds.some((id) => !existingIds.has(id))
       ) {
-        throw new Error("Reorder list must contain each field of this form exactly once");
+        throw serviceError("BAD_REQUEST", "Reorder list must contain each field of this form exactly once");
       }
 
       for (const [index, id] of orderedFieldIds.entries()) {
@@ -176,7 +177,7 @@ export default class FormFieldService {
           .set({ fieldOrder: index })
           .where(and(eq(formField.id, id), eq(formField.formId, formId)))
           .returning({ id: formField.id });
-        if (!reorderedField) throw new Error("Form field not found during reorder");
+        if (!reorderedField) throw serviceError("NOT_FOUND", "Form field not found");
       }
 
       return { reordered: orderedFieldIds.length };
@@ -198,7 +199,7 @@ export default class FormFieldService {
         .returning({ id: formField.id });
 
       if (!deletedField) {
-        throw new Error("Form field not found");
+        throw serviceError("NOT_FOUND", "Form field not found");
       }
 
       return deletedField;

@@ -9,6 +9,7 @@ import { useFormResponses } from "~/hooks/form/use-form-responses";
 import { useFormSnapshotById } from "~/hooks/form/use-form-snapshots";
 import { authClient } from "~/lib/auth-client";
 import { toast } from "sonner";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 function formatAnswer(value: unknown) {
   if (typeof value === "string") return value;
@@ -52,7 +53,7 @@ export default function ResponsesPage() {
       await deleteSubmissionAsync({ submissionId: selectedSubmissionId });
       setSelectedSubmissionId(undefined);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to delete this response.");
+      toast.error(getTrpcErrorMessage(error, "Unable to delete this response."));
     }
   }
 

@@ -32,6 +32,7 @@ import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
 import { fieldSetHash } from "./snapshot-utils";
+import { serviceError } from "../errors";
 
 const formSnapshotService = new FormSnapshotService();
 
@@ -67,7 +68,7 @@ export default class FormService {
       .returning(this.formSelection());
 
     if (!newForm) {
-      throw new Error("Form creation failed");
+      throw serviceError("INTERNAL_SERVER_ERROR", "Form creation failed");
     }
 
     return newForm;
@@ -82,7 +83,7 @@ export default class FormService {
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
     if (!foundForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return foundForm;
@@ -100,7 +101,7 @@ export default class FormService {
         isNotNull(form.userId),
       ));
 
-    if (!foundForm) throw new Error("Form not found");
+    if (!foundForm) throw serviceError("NOT_FOUND", "Form not found");
     assertFormAccess(foundForm.accessPolicy, userId);
     return foundForm;
   }
@@ -115,7 +116,7 @@ export default class FormService {
       .returning(this.formSelection());
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;
@@ -131,7 +132,7 @@ export default class FormService {
       .returning(this.formSelection());
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;
@@ -147,7 +148,7 @@ export default class FormService {
       .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
       .returning(this.formSelection());
 
-    if (!updatedForm) throw new Error("Form not found");
+    if (!updatedForm) throw serviceError("NOT_FOUND", "Form not found");
     return updatedForm;
   }
 
@@ -161,7 +162,7 @@ export default class FormService {
       .returning({ id: form.id });
 
     if (!deletedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return deletedForm;
@@ -187,7 +188,7 @@ export default class FormService {
       .returning(this.formSelection());
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;
@@ -200,7 +201,7 @@ export default class FormService {
   public async updateResponseLimit(input: UpdateFormResponseLimitType) {
     const { formId, userRole, responseLimit } = await updateFormResponseLimit.parseAsync(input);
     if (userRole !== "admin") {
-      throw new Error("Unauthorized: Only admin can update form response limit");
+      throw serviceError("FORBIDDEN", "Only an administrator can update the form response limit");
     }
 
     const [updatedForm] = await db
@@ -210,7 +211,7 @@ export default class FormService {
       .returning({ id: form.id, responseLimit: form.responseLimit });
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;
@@ -234,7 +235,7 @@ export default class FormService {
       .returning({ id: form.id, views: form.views });
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;
@@ -254,9 +255,9 @@ export default class FormService {
         .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
       if (!currentForm) {
-        throw new Error("Form not found");
+        throw serviceError("NOT_FOUND", "Form not found");
       }
-      if (currentForm.isArchived) throw new Error("Archived forms cannot be published");
+      if (currentForm.isArchived) throw serviceError("FORBIDDEN", "Archived forms cannot be published");
 
       const currentFields = await tx
         .select()
@@ -289,7 +290,7 @@ export default class FormService {
         .returning({ ...this.formSelection(), currentVersion: form.currentVersion });
 
       if (!updatedForm) {
-        throw new Error("Form not found");
+        throw serviceError("NOT_FOUND", "Form not found");
       }
 
       if (!unchanged) {
@@ -318,12 +319,12 @@ export default class FormService {
       .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
     if (!existingForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
-    if (existingForm.isArchived) throw new Error("Archived forms cannot be changed");
+    if (existingForm.isArchived) throw serviceError("FORBIDDEN", "Archived forms cannot be changed");
 
     if (!existingForm.isPublished) {
-      throw new Error("Form is already unpublished");
+      throw serviceError("CONFLICT", "Form is already unpublished");
     }
 
     const [updatedForm] = await db
@@ -333,7 +334,7 @@ export default class FormService {
       .returning(this.formSelection());
 
     if (!updatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
 
     return updatedForm;

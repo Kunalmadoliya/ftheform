@@ -11,6 +11,7 @@ import { StarRating } from "~/components/forms/star-rating";
 import { usePublicForm } from "~/hooks/form/use-public-form";
 import { useSubmission } from "~/hooks/form/use-submission";
 import { toast } from "sonner";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 type FormField = {
   id: string;
@@ -100,7 +101,7 @@ export default function PublicFormPage() {
         setInteractionError("");
       })
       .catch((error: unknown) => {
-        setInteractionError(error instanceof Error ? error.message : "Unable to start this response.");
+        setInteractionError(getTrpcErrorMessage(error, "Unable to start this response."));
       });
   }, [form, formId, startSubmissionAsync, submissionId]);
 
@@ -109,7 +110,7 @@ export default function PublicFormPage() {
     const timer = window.setTimeout(() => {
       autosaveTimer.current = undefined;
       void updateDraftAnswerAsync({ submissionId, draftAnswer: answers }).catch((error: unknown) => {
-        setInteractionError(error instanceof Error ? error.message : "Unable to save your progress.");
+        setInteractionError(getTrpcErrorMessage(error, "Unable to save your progress."));
       });
     }, 500);
     autosaveTimer.current = timer;
@@ -155,13 +156,13 @@ export default function PublicFormPage() {
       setAlreadySubmitted(result.id !== submissionId);
       setSubmitted(true);
     } catch (error) {
-      setInteractionError(error instanceof Error ? error.message : "Unable to submit this response.");
+      setInteractionError(getTrpcErrorMessage(error, "Unable to submit this response."));
     }
   }
 
   if (!formId) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
   if (formQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
-  if (formQuery.error?.message.includes("Authentication required")) {
+  if (formQuery.error?.data?.code === "UNAUTHORIZED") {
     const returnTo = `/form/${encodeURIComponent(formUrl)}`;
     return (
       <main className="mx-auto max-w-2xl p-8">
@@ -173,7 +174,7 @@ export default function PublicFormPage() {
       </main>
     );
   }
-  if (formQuery.error?.message.includes("only accepts anonymous responses")) {
+  if (formQuery.error?.data?.code === "FORBIDDEN") {
     return (
       <main className="mx-auto max-w-2xl p-8">
         <h1 className="text-xl font-semibold">Anonymous responses only</h1>

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
 import { validateSnapshotDraft } from "./draft-validation";
+import { serviceError } from "../errors";
 import { buildSubmissionAnswerRows } from "./answer-rows";
 import {
   validateSubmittedFormVersion,
@@ -42,7 +43,7 @@ export default class SubmissionService {
     if (respondentId) {
       return and(isNull(submission.userId), eq(submission.respondentId, respondentId));
     }
-    throw new Error("A valid respondent identity is required");
+    throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
   }
 
   private async lockSubmissionIdentities(
@@ -75,7 +76,7 @@ export default class SubmissionService {
       .set({ snapshotId: snapshot.id, draftAnswer: migratedDraft, lastActivity: new Date() })
       .where(and(eq(submission.id, currentSubmission.id), eq(submission.status, "filling")))
       .returning();
-    if (!migratedSubmission) throw new Error("Unable to migrate the active response");
+    if (!migratedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to migrate the active response");
     return migratedSubmission;
   }
 
@@ -90,7 +91,7 @@ export default class SubmissionService {
       .set({ respondentId })
       .where(and(eq(submission.id, currentSubmission.id), eq(submission.status, "filling")))
       .returning();
-    if (!updatedSubmission) throw new Error("Unable to set the response identity");
+    if (!updatedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to set the response identity");
     return updatedSubmission;
   }
 
@@ -113,11 +114,11 @@ export default class SubmissionService {
       .for("share");
 
     if (!validatedForm) {
-      throw new Error("Form not found");
+      throw serviceError("NOT_FOUND", "Form not found");
     }
-    if (validatedForm.isArchived || !validatedForm.ownerId) throw new Error("Form is archived");
-    if (!validatedForm.isPublished) throw new Error("Form is not published");
-    if (!validatedForm.isOpen) throw new Error("Form is closed");
+    if (validatedForm.isArchived || !validatedForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+    if (!validatedForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
+    if (!validatedForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
     assertFormAccess(validatedForm.accessPolicy, userId);
 
     const [matchingSnapshot] = await db
@@ -131,7 +132,7 @@ export default class SubmissionService {
       );
 
     if (!matchingSnapshot) {
-      throw new Error("Form snapshot not found");
+      throw serviceError("NOT_FOUND", "Form snapshot not found");
     }
 
     return { form: validatedForm, snapshot: matchingSnapshot };
@@ -167,10 +168,10 @@ export default class SubmissionService {
         .from(form)
         .where(eq(form.id, formId))
         .for("share");
-      if (!currentForm) throw new Error("Form not found");
-      if (currentForm.isArchived || !currentForm.ownerId) throw new Error("Form is archived");
-      if (!currentForm.isPublished) throw new Error("Form is not published");
-      if (!currentForm.isOpen) throw new Error("Form is closed");
+      if (!currentForm) throw serviceError("NOT_FOUND", "Form not found");
+      if (currentForm.isArchived || !currentForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+      if (!currentForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
+      if (!currentForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
       assertFormAccess(currentForm.accessPolicy, userId);
 
       const [snapshot] = await tx
@@ -179,7 +180,7 @@ export default class SubmissionService {
         .where(and(eq(formSnapshot.formId, formId), eq(formSnapshot.versions, currentForm.currentVersion)))
         .orderBy(desc(formSnapshot.createdAt))
         .limit(1);
-      if (!snapshot) throw new Error("Form snapshot not found");
+      if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
 
       const identityFilters = [
         ...(userId ? [eq(submission.userId, userId)] : []),
@@ -250,7 +251,7 @@ export default class SubmissionService {
             .set({ userId, respondentId, lastActivity: new Date() })
             .where(and(eq(submission.id, migratedDraft.id), eq(submission.status, "filling")))
             .returning();
-          if (!adoptedDraft) throw new Error("Unable to resume the anonymous response");
+          if (!adoptedDraft) throw serviceError("CONFLICT", "Unable to resume the anonymous response");
           return { outcome: "started" as const, submission: adoptedDraft };
         }
       }
@@ -259,9 +260,9 @@ export default class SubmissionService {
         .select({ submittedCount: count() })
         .from(submission)
         .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")));
-      if (!submittedResult) throw new Error("Unable to check the form response limit");
+      if (!submittedResult) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form response limit");
       if (submittedResult.submittedCount >= currentForm.responseLimit) {
-        throw new Error("This form has reached its response limit");
+        throw serviceError("TOO_MANY_REQUESTS", "This form has reached its response limit");
       }
 
       const [newSubmission] = await tx
@@ -275,7 +276,7 @@ export default class SubmissionService {
           submittedAt: null,
         })
         .returning();
-      if (!newSubmission) throw new Error("Failed to start submission");
+      if (!newSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to start submission");
       return { outcome: "started" as const, submission: newSubmission };
     });
 
@@ -300,7 +301,7 @@ export default class SubmissionService {
       .select({ accessPolicy: form.accessPolicy })
       .from(form)
       .where(eq(form.id, formId));
-    if (!formAccess) throw new Error("Form not found");
+    if (!formAccess) throw serviceError("NOT_FOUND", "Form not found");
     assertFormAccess(formAccess.accessPolicy, userId);
     const [activeSubmission] = await db
       .select()
@@ -313,7 +314,7 @@ export default class SubmissionService {
       .orderBy(desc(submission.lastActivity));
 
     if (!activeSubmission) {
-      throw new Error("Active submission not found");
+      throw serviceError("NOT_FOUND", "Active submission not found");
     }
 
     return activeSubmission;
@@ -334,7 +335,7 @@ export default class SubmissionService {
           this.respondentCondition(userId, respondentId),
         ));
     if (!submissionResult) {
-      throw new Error("Submission not found");
+      throw serviceError("NOT_FOUND", "Submission not found");
     }
     assertFormAccess(submissionResult.accessPolicy, userId);
     const submissionRecord = submissionResult.submissionRecord;
@@ -356,11 +357,11 @@ export default class SubmissionService {
         .where(and(eq(submission.id, submissionId), this.respondentCondition(userId, respondentId)))
         .limit(1)
         .for("update");
-      if (!existing) throw new Error("Submission not found");
-      if (existing.isArchived || !existing.ownerId) throw new Error("Form is archived");
+      if (!existing) throw serviceError("NOT_FOUND", "Submission not found");
+      if (existing.isArchived || !existing.ownerId) throw serviceError("NOT_FOUND", "Submission not found");
       assertFormAccess(existing.accessPolicy, userId);
       if (existing.submissionRecord.status !== "filling") {
-        throw new Error("Submission is already finalized");
+        throw serviceError("CONFLICT", "Submission is already finalized");
       }
 
       const [snapshot] = await tx
@@ -368,7 +369,7 @@ export default class SubmissionService {
         .from(formSnapshot)
         .where(eq(formSnapshot.id, existing.submissionRecord.snapshotId))
         .limit(1);
-      if (!snapshot) throw new Error("Form snapshot not found");
+      if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
       const currentDraft = existing.submissionRecord.draftAnswer &&
         typeof existing.submissionRecord.draftAnswer === "object" &&
         !Array.isArray(existing.submissionRecord.draftAnswer)
@@ -384,7 +385,7 @@ export default class SubmissionService {
         .set({ draftAnswer: validatedDraft.draft, lastActivity: new Date() })
         .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
         .returning();
-      if (!updatedSubmission) throw new Error("Submission not found");
+      if (!updatedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
       return updatedSubmission;
     });
   }
@@ -392,7 +393,7 @@ export default class SubmissionService {
   public async updateLastActivity(input: updateLastActivitySchemaType) {
     const { submissionId, userId, respondentId } = await updateLastActivitySchema.parseAsync(input);
     const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
-    if (existing.status !== "filling") throw new Error("Submission is already finalized");
+    if (existing.status !== "filling") throw serviceError("CONFLICT", "Submission is already finalized");
     const [updatedSubmission] = await db
       .update(submission)
       .set({ lastActivity: new Date() })
@@ -402,7 +403,7 @@ export default class SubmissionService {
         this.respondentCondition(userId, respondentId),
       ))
       .returning();
-    if (!updatedSubmission) throw new Error("Submission not found");
+    if (!updatedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
     return updatedSubmission;
   }
 
@@ -430,9 +431,9 @@ export default class SubmissionService {
           this.respondentCondition(userId, respondentId),
         ))
         .for("update");
-      if (!currentSubmission) throw new Error("Submission not found");
+      if (!currentSubmission) throw serviceError("NOT_FOUND", "Submission not found");
       if (currentSubmission.status === "submitted") return currentSubmission;
-      if (currentSubmission.status !== "filling") throw new Error("Submission is already finalized");
+      if (currentSubmission.status !== "filling") throw serviceError("CONFLICT", "Submission is already finalized");
 
       const [formSettings] = await tx
         .select({
@@ -448,10 +449,10 @@ export default class SubmissionService {
         .from(form)
         .where(eq(form.id, existing.formId))
         .for("share");
-      if (!formSettings) throw new Error("Form not found");
-      if (formSettings.isArchived || !formSettings.ownerId) throw new Error("Form is archived");
-      if (!formSettings.isPublished) throw new Error("Form is not published");
-      if (!formSettings.isOpen) throw new Error("Form is closed");
+      if (!formSettings) throw serviceError("NOT_FOUND", "Form not found");
+      if (formSettings.isArchived || !formSettings.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+      if (!formSettings.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
+      if (!formSettings.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
       assertFormAccess(formSettings.accessPolicy, userId);
 
       const [snapshot] = await tx
@@ -463,9 +464,9 @@ export default class SubmissionService {
         ))
         .orderBy(desc(formSnapshot.createdAt))
         .limit(1);
-      if (!snapshot) throw new Error("Form snapshot not found");
+      if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
       if (currentSubmission.snapshotId !== snapshot.id) {
-        throw new Error("Submission version is out of date");
+        throw serviceError("CONFLICT", "Submission version is out of date");
       }
       const validatedDraft = validateSnapshotDraft(
         snapshot.fieldsJson,
@@ -494,9 +495,9 @@ export default class SubmissionService {
         .select({ submittedCount: count() })
         .from(submission)
         .where(and(eq(submission.formId, existing.formId), eq(submission.status, "submitted")));
-      if (!submittedResult) throw new Error("Unable to check the form response limit");
+      if (!submittedResult) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form response limit");
       if (submittedResult.submittedCount >= formSettings.responseLimit) {
-        throw new Error("This form has reached its response limit");
+        throw serviceError("TOO_MANY_REQUESTS", "This form has reached its response limit");
       }
 
       const currentFields = await tx
@@ -524,7 +525,7 @@ export default class SubmissionService {
             .set({ fieldId: row.fieldId, value: row.value })
             .where(eq(answer.id, existingAnswer.id))
             .returning({ id: answer.id });
-          if (!updatedAnswer) throw new Error("Failed to update answer");
+          if (!updatedAnswer) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to update answer");
         } else {
           const [createdAnswer] = await tx
             .insert(answer)
@@ -535,7 +536,7 @@ export default class SubmissionService {
               value: row.value,
             })
             .returning({ id: answer.id });
-          if (!createdAnswer) throw new Error("Failed to save answer");
+          if (!createdAnswer) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to save answer");
         }
       }
 
@@ -553,7 +554,7 @@ export default class SubmissionService {
           this.respondentCondition(userId, respondentId),
         ))
         .returning();
-      if (!updatedSubmission) throw new Error("Failed to submit form");
+      if (!updatedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to submit form");
       return updatedSubmission;
     });
   }
@@ -561,7 +562,7 @@ export default class SubmissionService {
   public async listSubmissionsByForm(input: listSubmissionsByFormSchemaType) {
     const { formId, userId } = await listSubmissionsByFormSchema.parseAsync(input);
     const [ownedForm] = await db.select({ id: form.id }).from(form).where(and(eq(form.id, formId), eq(form.userId, userId)));
-    if (!ownedForm) throw new Error("Form not found");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
     return db
       .select()
       .from(submission)
@@ -597,7 +598,7 @@ export default class SubmissionService {
         this.respondentCondition(userId, respondentId),
       ))
       .returning();
-    if (!updatedSubmission) throw new Error("Failed to mark submission as not submitted");
+    if (!updatedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to mark submission as not submitted");
     return updatedSubmission;
   }
 
@@ -613,13 +614,13 @@ export default class SubmissionService {
       !existingSubmission ||
       (existingSubmission.userId !== userId && existingSubmission.formOwnerId !== userId)
     ) {
-      throw new Error("Submission not found");
+      throw serviceError("NOT_FOUND", "Submission not found");
     }
     const [deletedSubmission] = await db
       .delete(submission)
       .where(eq(submission.id, submissionId))
       .returning({ id: submission.id });
-    if (!deletedSubmission) throw new Error("Submission not found");
+    if (!deletedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
     return deletedSubmission;
   }
 }

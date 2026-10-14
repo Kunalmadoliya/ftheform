@@ -14,6 +14,7 @@ import {
 } from "./model";
 import { assertFormAccess } from "../form/access";
 import { validateSnapshotDraft } from "../form_submission/draft-validation";
+import { serviceError } from "../errors";
 
 export default class AnswerService {
   public async saveAnswer(input: SaveAnswerInputType) {
@@ -25,7 +26,7 @@ export default class AnswerService {
       userId,
       respondentId,
     });
-    if (!savedAnswer) throw new Error("Failed to save answer");
+    if (!savedAnswer) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to save answer");
     return savedAnswer;
   }
 
@@ -41,7 +42,7 @@ export default class AnswerService {
       : respondentId
         ? and(isNull(submission.userId), eq(submission.respondentId, respondentId))
         : undefined;
-    if (!identityCondition) throw new Error("A valid respondent identity is required");
+    if (!identityCondition) throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
 
     return db.transaction(async (tx) => {
       const [submissionResult] = await tx
@@ -56,14 +57,14 @@ export default class AnswerService {
         .where(and(eq(submission.id, submissionId), identityCondition))
         .limit(1)
         .for("update");
-      if (!submissionResult) throw new Error("Submission not found");
+      if (!submissionResult) throw serviceError("NOT_FOUND", "Submission not found");
       const { submissionRecord } = submissionResult;
       if (submissionResult.isArchived || !submissionResult.ownerId) {
-        throw new Error("Form is archived");
+        throw serviceError("FORBIDDEN", "Form is archived");
       }
       assertFormAccess(submissionResult.accessPolicy, userId);
       if (submissionRecord.status !== "filling") {
-        throw new Error("Submission is already finalized");
+        throw serviceError("CONFLICT", "Submission is already finalized");
       }
 
       const [snapshot] = await tx
@@ -71,7 +72,7 @@ export default class AnswerService {
         .from(formSnapshot)
         .where(eq(formSnapshot.id, submissionRecord.snapshotId))
         .limit(1);
-      if (!snapshot) throw new Error("Form snapshot not found");
+      if (!snapshot) throw serviceError("NOT_FOUND", "Form snapshot not found");
 
       const validatedAnswers = validateSnapshotDraft(
         snapshot.fieldsJson,
@@ -81,13 +82,13 @@ export default class AnswerService {
       const fieldsById = new Map(validatedAnswers.fields.map((field) => [field.id, field]));
       const requestedFieldIds = Object.keys(answers);
       if (requestedFieldIds.some((fieldId) => !fieldsById.has(fieldId))) {
-        throw new Error("Answer contains a field that is not in the submission snapshot");
+        throw serviceError("BAD_REQUEST", "Answer contains a field that is not in the submission snapshot");
       }
 
       const savedAnswers = [];
       for (const [fieldId, value] of Object.entries(answers)) {
         const field = fieldsById.get(fieldId);
-        if (!field) throw new Error("Form field not found in submission snapshot");
+        if (!field) throw serviceError("BAD_REQUEST", "Form field is not in the submission snapshot");
         const [currentField] = await tx
           .select({ id: formField.id })
           .from(formField)
@@ -113,14 +114,14 @@ export default class AnswerService {
             .set({ fieldId: answerFieldId, value })
             .where(eq(answer.id, existingAnswer.id))
             .returning();
-          if (!updatedAnswer) throw new Error("Failed to update answer");
+          if (!updatedAnswer) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to update answer");
           savedAnswers.push(updatedAnswer);
         } else {
           const [newAnswer] = await tx
             .insert(answer)
             .values({ submissionId, fieldId: answerFieldId, fieldKey: field.fieldKey, value })
             .returning();
-          if (!newAnswer) throw new Error("Failed to save answer");
+          if (!newAnswer) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to save answer");
           savedAnswers.push(newAnswer);
         }
       }
@@ -143,7 +144,7 @@ export default class AnswerService {
         ),
       )
       .limit(1);
-    if (!ownedSubmission) throw new Error("Submission not found");
+    if (!ownedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
 
     return db.select().from(answer).where(eq(answer.submissionId, submissionId));
   }
@@ -156,7 +157,7 @@ export default class AnswerService {
       .innerJoin(form, eq(formField.formId, form.id))
       .where(and(eq(formField.id, fieldId), eq(form.userId, userId)))
       .limit(1);
-    if (!ownedField) throw new Error("Form field not found");
+    if (!ownedField) throw serviceError("NOT_FOUND", "Form field not found");
 
     return db
       .select({

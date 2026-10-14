@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { serviceError } from "../errors";
 
 const snapshotIdentityFields = z.array(
   z.object({ id: z.string(), fieldKey: z.string() }).passthrough(),
@@ -13,7 +14,7 @@ export function migrateDraftAnswers(
   const oldFields = snapshotIdentityFields.safeParse(oldFieldsJson);
   const newFields = snapshotIdentityFields.safeParse(newFieldsJson);
   if (!oldFields.success || !newFields.success) {
-    throw new Error("Form snapshot fields are invalid");
+    throw serviceError("INTERNAL_SERVER_ERROR", "Form snapshot fields are invalid");
   }
 
   const oldFieldKeys = new Map(oldFields.data.map((field) => [field.id, field.fieldKey]));

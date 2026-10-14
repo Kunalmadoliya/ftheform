@@ -17,6 +17,7 @@ import { useFormFields } from "~/hooks/form/use-form-fields";
 import { authClient } from "~/lib/auth-client";
 import { toast } from "sonner";
 import { useUserRole } from "~/hooks/auth/use-user-role";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 type BuilderPageProps = { formId: string };
 
@@ -95,7 +96,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
         setSavedTitle(nextTitle);
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to save the form title.");
+        toast.error(getTrpcErrorMessage(error, "Unable to save the form title."));
         return false;
       }
     }
@@ -109,7 +110,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
         setSavedDescription(nextDescription ?? "");
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to save the form description.");
+        toast.error(getTrpcErrorMessage(error, "Unable to save the form description."));
         return false;
       }
     }
@@ -122,7 +123,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       await toggleFormOpenAsync({ formId, isOpen: nextIsOpen });
     } catch (error) {
       setIsOpen(previousIsOpen);
-      toast.error(error instanceof Error ? error.message : "Unable to update form availability.");
+      toast.error(getTrpcErrorMessage(error, "Unable to update form availability."));
     }
   }
   async function handleResponseLimitSave(nextResponseLimit: number) {
@@ -130,7 +131,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       const result = await updateResponseLimitAsync({ formId, responseLimit: nextResponseLimit });
       setResponseLimit(result.responseLimit);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to update the response limit.");
+      toast.error(getTrpcErrorMessage(error, "Unable to update the response limit."));
     }
   }
   async function handleSettingsChange(
@@ -150,7 +151,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     } catch (error) {
       setAccessPolicy(previousAccessPolicy);
       setAllowMultipleSubmissions(previousAllowMultipleSubmissions);
-      toast.error(error instanceof Error ? error.message : "Unable to save form settings.");
+      toast.error(getTrpcErrorMessage(error, "Unable to save form settings."));
     }
   }
   async function publishForm() {
@@ -161,7 +162,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       setPublishedUrl(publishedForm.formUrl);
       return publishedForm.formUrl;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to publish this form.");
+      toast.error(getTrpcErrorMessage(error, "Unable to publish this form."));
       return null;
     } finally {
       setIsPublishing(false);
@@ -181,7 +182,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       const field = await createFieldAsync({ formId, type: definition.type, category: "input", label: definition.label, required: false, config });
       setSelectedFieldId(field.id);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to add this field.");
+      toast.error(getTrpcErrorMessage(error, "Unable to add this field."));
     }
   }
   async function saveField(updates: { label: string; required: boolean; config: Record<string, unknown> }) {
@@ -189,7 +190,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     try {
       await updateFieldAsync({ formId, formFieldId: selectedField.id, label: updates.label, required: updates.required, config: updates.config });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save this field.");
+      toast.error(getTrpcErrorMessage(error, "Unable to save this field."));
     }
   }
   async function deleteSelectedField() {
@@ -198,7 +199,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       await deleteFieldAsync({ formId, formFieldId: selectedField.id });
       setSelectedFieldId(undefined);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to delete this field.");
+      toast.error(getTrpcErrorMessage(error, "Unable to delete this field."));
     }
   }
   async function deleteFieldFromCanvas(field: BuilderField) {
@@ -207,7 +208,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       await deleteFieldAsync({ formId, formFieldId: field.id });
       if (selectedFieldId === field.id) setSelectedFieldId(undefined);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to delete this field.");
+      toast.error(getTrpcErrorMessage(error, "Unable to delete this field."));
     }
   }
   async function moveField(field: BuilderField, direction: -1 | 1) {
@@ -222,14 +223,14 @@ export function BuilderPage({ formId }: BuilderPageProps) {
     try {
       await reorderFieldsAsync({ formId, orderedFieldIds: orderedFields.map((item) => item.id) });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to reorder fields.");
+      toast.error(getTrpcErrorMessage(error, "Unable to reorder fields."));
     }
   }
   async function reorderFields(orderedFieldIds: string[]) {
     try {
       await reorderFieldsAsync({ formId, orderedFieldIds });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to reorder fields.");
+      toast.error(getTrpcErrorMessage(error, "Unable to reorder fields."));
     }
   }
 

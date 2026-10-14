@@ -5,6 +5,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import FormFieldService from "../form_feild";
 import { getOpenAiClient } from "./client";
 import { formGenerationRequested, inngest } from "./inngest-client";
+import { serviceError } from "../errors";
 import {
   formGenerationJobOutput,
   generatedFieldsSchema,
@@ -25,7 +26,7 @@ export default class FormAiService {
       .select({ id: form.id })
       .from(form)
       .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
-    if (!ownedForm) throw new Error("Form not found");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
     const [job] = await db
       .insert(formGenerationJob)
@@ -38,7 +39,7 @@ export default class FormAiService {
         createdAt: formGenerationJob.createdAt,
         updatedAt: formGenerationJob.updatedAt,
       });
-    if (!job) throw new Error("Failed to create the form generation job");
+    if (!job) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to create the form generation job");
 
     try {
       await inngest.send(formGenerationRequested.create({ jobId: job.id }));
@@ -47,7 +48,7 @@ export default class FormAiService {
         job.id,
         "Unable to queue generation. Check Inngest connectivity and retry.",
       );
-      throw new Error("Unable to start form generation. Check Inngest configuration and retry.");
+      throw serviceError("INTERNAL_SERVER_ERROR", "Unable to start form generation. Check Inngest configuration and retry.");
     }
 
     return formGenerationJobOutput.parse(job);
@@ -66,7 +67,7 @@ export default class FormAiService {
       })
       .from(formGenerationJob)
       .where(and(eq(formGenerationJob.id, jobId), eq(formGenerationJob.userId, userId)));
-    if (!job) throw new Error("Form generation job not found");
+    if (!job) throw serviceError("NOT_FOUND", "Form generation job not found");
     return formGenerationJobOutput.parse(job);
   }
 
@@ -75,7 +76,7 @@ export default class FormAiService {
       .select()
       .from(formGenerationJob)
       .where(eq(formGenerationJob.id, jobId));
-    if (!job) throw new Error("Form generation job not found");
+    if (!job) throw serviceError("NOT_FOUND", "Form generation job not found");
     return job;
   }
 
@@ -94,7 +95,7 @@ export default class FormAiService {
     if (currentJob?.status === "running" || currentJob?.status === "completed") {
       return currentJob.status;
     }
-    throw new Error("Form generation job cannot be started");
+    throw serviceError("CONFLICT", "Form generation job cannot be started");
   }
 
   public async generateFields(prompt: string): Promise<GeneratedFields> {
@@ -112,7 +113,7 @@ export default class FormAiService {
         format: zodTextFormat(openAiGeneratedFieldsSchema, "generated_form_fields"),
       },
     });
-    if (!response.output_parsed) throw new Error("The AI returned no structured form fields");
+    if (!response.output_parsed) throw serviceError("INTERNAL_SERVER_ERROR", "The AI returned no structured form fields");
 
     const parsed = openAiGeneratedFieldsSchema.parse(response.output_parsed);
     const configKeys: Record<string, string[]> = {
@@ -132,7 +133,7 @@ export default class FormAiService {
         ([key, value]) => !allowedKeys.includes(key) && value !== null,
       );
       if (hasInvalidConfig) {
-        throw new Error(`The AI returned unsupported configuration for ${field.type}`);
+        throw serviceError("INTERNAL_SERVER_ERROR", `The AI returned unsupported configuration for ${field.type}`);
       }
       const config = Object.fromEntries(
         allowedKeys
@@ -159,9 +160,9 @@ export default class FormAiService {
         .from(formGenerationJob)
         .where(eq(formGenerationJob.id, jobId))
         .for("update");
-      if (!job) throw new Error("Form generation job not found");
+      if (!job) throw serviceError("NOT_FOUND", "Form generation job not found");
       if (job.status === "completed") return job;
-      if (job.status === "failed") throw new Error("Form generation job has failed");
+      if (job.status === "failed") throw serviceError("CONFLICT", "Form generation job has failed");
 
       await formFields.createGeneratedFieldsInTransaction(
         tx,
@@ -174,7 +175,7 @@ export default class FormAiService {
         .set({ status: "completed", error: null })
         .where(eq(formGenerationJob.id, jobId))
         .returning();
-      if (!completedJob) throw new Error("Failed to complete form generation job");
+      if (!completedJob) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to complete form generation job");
       return completedJob;
     });
   }

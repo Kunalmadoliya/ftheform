@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { serviceError } from "../errors";
 
 export const MAX_DRAFT_ANSWER_BYTES = 64 * 1024;
 export const MAX_ANSWER_STRING_LENGTH = 10_000;
@@ -120,7 +121,9 @@ export function validateSnapshotDraft(
   options: { requireRequired: boolean },
 ) {
   const parsedFields = z.array(snapshotFieldSchema).safeParse(fieldsJson);
-  if (!parsedFields.success) throw issue("Form snapshot fields are invalid");
+  if (!parsedFields.success) {
+    throw serviceError("INTERNAL_SERVER_ERROR", "Form snapshot fields are invalid");
+  }
   if (draftAnswer !== null && draftAnswer !== undefined &&
     (typeof draftAnswer !== "object" || Array.isArray(draftAnswer))) {
     throw issue("Draft answers must be an object");

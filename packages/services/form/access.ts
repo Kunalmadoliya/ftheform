@@ -3,11 +3,13 @@ export type FormAccessPolicy =
   | "anonymous_only"
   | "authenticated_only";
 
+import { serviceError } from "../errors";
+
 export function assertFormAccess(policy: FormAccessPolicy, userId: string | null | undefined) {
   if (policy === "authenticated_only" && !userId) {
-    throw new Error("Authentication required to access this form.");
+    throw serviceError("UNAUTHORIZED", "Authentication is required to access this form.");
   }
   if (policy === "anonymous_only" && userId) {
-    throw new Error("This form only accepts anonymous responses.");
+    throw serviceError("FORBIDDEN", "This form only accepts anonymous responses.");
   }
 }

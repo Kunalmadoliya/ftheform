@@ -8,6 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { useForm } from "~/hooks/form/use-form";
 import { trpc } from "~/trpc/client";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 type TemplateField = {
   type: string;
@@ -135,11 +136,7 @@ export function TemplatesPage() {
       }
       router.push(`/forms/${form.id}/builder`);
     } catch (creationError) {
-      setError(
-        creationError instanceof Error
-          ? creationError.message
-          : "Unable to create this template.",
-      );
+      setError(getTrpcErrorMessage(creationError, "Unable to create this template."));
     } finally {
       setCreatingTemplateId(undefined);
     }

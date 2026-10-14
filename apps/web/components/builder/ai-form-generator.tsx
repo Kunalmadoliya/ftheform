@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { trpc } from "~/trpc/client";
+import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 type AiFormGeneratorProps = { formId: string };
 
@@ -46,9 +47,7 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
       const job = await startGeneration.mutateAsync({ formId, prompt });
       setJobId(job.id);
     } catch (error) {
-      setRequestError(
-        error instanceof Error ? error.message : "Unable to start form generation.",
-      );
+      setRequestError(getTrpcErrorMessage(error, "Unable to start form generation."));
     }
   }
 
