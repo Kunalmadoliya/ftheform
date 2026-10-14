@@ -4,7 +4,8 @@ const envSchema = z.object({
 
   BASE_URL: z.string().default("http://localhost:8000").describe("Better Auth URL"),
   WEB_URL: z.string().default("http://localhost:3000").describe("Web URL"),
-
+  OPENAI_API_KEY: z.string().trim().optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default("gpt-4.1-mini"),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

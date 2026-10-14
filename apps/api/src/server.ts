@@ -11,7 +11,11 @@ import { apiReference } from "@scalar/express-api-reference";
 
 import { serverRouter, createContext } from "@repo/trpc/server";
 import { serve as serveInngest } from "inngest/express";
-import { generateFormFieldsFunction } from "@repo/services/form_ai/functions";
+import {
+  clearExpiredFormGenerationPromptsFunction,
+  failStaleFormGenerationJobsFunction,
+  generateFormFieldsFunction,
+} from "@repo/services/form_ai/functions";
 import { expireInactiveSubmissionsFunction } from "@repo/services/form_submission/functions";
 import { inngest } from "@repo/services/form_ai/inngest-client";
 import { createPublicProcedureRateLimit } from "./public-rate-limit";
@@ -43,7 +47,12 @@ app.use(
   "/api/inngest",
   serveInngest({
     client: inngest,
-    functions: [generateFormFieldsFunction, expireInactiveSubmissionsFunction],
+    functions: [
+      generateFormFieldsFunction,
+      failStaleFormGenerationJobsFunction,
+      clearExpiredFormGenerationPromptsFunction,
+      expireInactiveSubmissionsFunction,
+    ],
   }),
 );
 

@@ -16,6 +16,7 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
   const [jobId, setJobId] = useState<string>();
   const [requestError, setRequestError] = useState("");
   const completedJobId = useRef<string | undefined>(undefined);
+  const pollingStartedAt = useRef<number | undefined>(undefined);
   const utils = trpc.useUtils();
   const startGeneration = trpc.formAi.startGeneration.useMutation();
   const statusQuery = trpc.formAi.getGenerationStatus.useQuery(
@@ -25,18 +26,23 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
       retry: 2,
       refetchInterval: (query) => {
         const status = query.state.data?.status;
-        return status === "pending" || status === "running" ? 1500 : false;
+        const timedOut = pollingStartedAt.current !== undefined &&
+          Date.now() - pollingStartedAt.current >= 10 * 60 * 1000;
+        return (status === "pending" || status === "running") && !timedOut ? 1500 : false;
       },
     },
   );
   const status = statusQuery.data?.status;
-  const isGenerating =
-    startGeneration.isPending || status === "pending" || status === "running";
+  const hasActiveJob = status === "pending" || status === "running";
+  const pollingTimedOut = hasActiveJob && pollingStartedAt.current !== undefined &&
+    Date.now() - pollingStartedAt.current >= 10 * 60 * 1000;
+  const isGenerating = startGeneration.isPending || (hasActiveJob && !pollingTimedOut);
 
   useEffect(() => {
     if (status !== "completed" || !jobId || completedJobId.current === jobId) return;
     completedJobId.current = jobId;
     void utils.formField.listFormFields.invalidate({ formId });
+    void utils.form.getFormById.invalidate({ formId });
     toast.success("Your generated fields are ready.");
   }, [formId, jobId, status, utils]);
 
@@ -45,6 +51,7 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
     setRequestError("");
     try {
       const job = await startGeneration.mutateAsync({ formId, prompt });
+      pollingStartedAt.current = Date.now();
       setJobId(job.id);
     } catch (error) {
       setRequestError(getTrpcErrorMessage(error, "Unable to start form generation."));
@@ -69,7 +76,7 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
           minLength={8}
           maxLength={2000}
           required
-          disabled={isGenerating}
+          disabled={isGenerating || hasActiveJob}
           aria-label="Describe the form to generate"
           placeholder="Create a customer feedback form for an online store..."
           className="min-h-24 resize-y text-sm"
@@ -77,7 +84,7 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
         <Button
           type="submit"
           className="w-full"
-          disabled={isGenerating || prompt.trim().length < 8}
+          disabled={isGenerating || hasActiveJob || prompt.trim().length < 8}
         >
           {isGenerating ? (
             <>
@@ -97,8 +104,15 @@ export function AiFormGenerator({ formId }: AiFormGeneratorProps) {
       ) : null}
       {status === "pending" || status === "running" ? (
         <p className="text-xs text-muted-foreground" role="status">
-          Cooking your form... This may take a little while.
+          {pollingTimedOut
+            ? "Status polling stopped after 10 minutes. Check the job status manually."
+            : "Cooking your form... This may take a little while."}
         </p>
+      ) : null}
+      {pollingTimedOut ? (
+        <Button type="button" variant="outline" onClick={() => void statusQuery.refetch()}>
+          Check status
+        </Button>
       ) : null}
       {statusQuery.isError ? (
         <div className="space-y-1 text-xs text-destructive" role="alert">

@@ -131,6 +131,9 @@ export const formGenerationJob = pgTable(
   (table) => [
     index("form_generation_job_form_idx").on(table.formId),
     index("form_generation_job_user_idx").on(table.userId),
+    uniqueIndex("form_generation_job_one_active_per_form_idx")
+      .on(table.formId)
+      .where(sql`${table.status} IN ('pending', 'running')`),
   ],
 );
 

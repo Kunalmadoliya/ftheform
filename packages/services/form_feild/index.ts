@@ -1,4 +1,4 @@
-import { and, db, eq, sql, asc } from "@repo/database";
+import { and, count, db, eq, sql, asc } from "@repo/database";
 import {
   createFormField,
   type CreateFormFieldType,
@@ -14,6 +14,8 @@ import {
 import { form, formField } from "@repo/database/models/form-schema";
 import { generatedFieldConfigSchema, type GeneratedFormField } from "../form_ai/model";
 import { serviceError } from "../errors";
+
+export const MAX_FORM_FIELDS = 100;
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -46,6 +48,15 @@ export default class FormFieldService {
     await this.validateFormOwnership(formId, userId);
 
     return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"form-fields:" + formId}, 0))`);
+      const [fieldCount] = await tx
+        .select({ count: count() })
+        .from(formField)
+        .where(eq(formField.formId, formId));
+      if (!fieldCount) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form field limit");
+      if (fieldCount.count >= MAX_FORM_FIELDS) {
+        throw serviceError("TOO_MANY_REQUESTS", "This form has reached its field limit");
+      }
       const result = await tx
         .select({ maxOrder: sql<number>`max(${formField.fieldOrder})` })
         .from(formField)
@@ -66,11 +77,12 @@ export default class FormFieldService {
   }
 
   public async createGeneratedFieldsInTransaction(
-    tx: Pick<typeof db, "select" | "insert">,
+    tx: Pick<typeof db, "select" | "insert" | "execute">,
     formId: string,
     userId: string,
     fields: GeneratedFormField[],
   ) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"form-fields:" + formId}, 0))`);
     const [ownedForm] = await tx
       .select({ id: form.id })
       .from(form)
@@ -82,6 +94,15 @@ export default class FormFieldService {
       .from(formField)
       .where(eq(formField.formId, formId));
     if (!orderResult) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to determine form field order");
+
+    const [fieldCount] = await tx
+      .select({ count: count() })
+      .from(formField)
+      .where(eq(formField.formId, formId));
+    if (!fieldCount) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form field limit");
+    if (fieldCount.count + fields.length > MAX_FORM_FIELDS) {
+      throw serviceError("TOO_MANY_REQUESTS", "Generated fields would exceed the form field limit");
+    }
 
     const startingOrder = (orderResult.maxOrder ?? -1) + 1;
     const createdFields = await tx

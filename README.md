@@ -68,6 +68,8 @@ In production, configure `OPENAI_API_KEY` and `OPENAI_MODEL` for the API. For In
 
 From a form builder, enter a description of the fields to generate in the right sidebar and choose **Generate fields**. Generated fields are validated against supported form field definitions and appended after the existing fields in a single transaction. They appear in the builder when the background job completes. If the form is already published, use **Republish** to create a new live snapshot; existing submissions remain tied to their original snapshot.
 
+Generation is limited to one pending/running job per form, 10 starts per user per UTC day, and 100 total fields per form. Jobs still pending or running after 10 minutes are marked failed, and stored prompts are cleared after 30 days.
+
 Useful root commands are `pnpm dev`, `pnpm build`, `pnpm check-types`, `pnpm lint`, `pnpm format`, `pnpm db:generate`, and `pnpm db:migrate`.
 
 ## Request Flow

@@ -1,6 +1,9 @@
 import { NonRetriableError } from "inngest";
 import { inngest } from "./inngest-client";
 import { formAiServiceInstance, safeGenerationError } from "./index";
+import { isOpenAiConfigurationError } from "./client";
+import { env } from "../env";
+import type { GeneratedFields } from "./model";
 
 export const generateFormFieldsFunction = inngest.createFunction(
   {
@@ -18,16 +21,44 @@ export const generateFormFieldsFunction = inngest.createFunction(
     );
     if (job.status === "completed") return { status: "completed" };
     if (job.status === "failed") throw new NonRetriableError("Form generation job has failed");
+    if (!env.OPENAI_API_KEY) {
+      await formAiServiceInstance.markFailed(job.id, "AI form generation is not configured.");
+      throw new NonRetriableError("AI form generation is not configured.");
+    }
 
     await step.run("mark-generation-running", () =>
       formAiServiceInstance.markRunning(job.id),
     );
-    const fields = await step.run("generate-fields", () =>
-      formAiServiceInstance.generateFields(job.prompt),
-    );
+    let fields: GeneratedFields;
+    try {
+      fields = await step.run("generate-fields", () =>
+        formAiServiceInstance.generateFields(job.prompt),
+      );
+    } catch (error) {
+      if (isOpenAiConfigurationError(error)) {
+        throw new NonRetriableError("OpenAI rejected the configured API credentials or model.");
+      }
+      throw error;
+    }
     await step.run("persist-generated-fields", () =>
       formAiServiceInstance.completeGeneration(job.id, fields),
     );
     return { status: "completed" };
   },
+);
+
+export const failStaleFormGenerationJobsFunction = inngest.createFunction(
+  { id: "fail-stale-form-generation-jobs", triggers: [{ cron: "*/5 * * * *" }] },
+  async ({ step }) =>
+    step.run("fail-stale-form-generation-jobs", () =>
+      formAiServiceInstance.failStaleJobs(),
+    ),
+);
+
+export const clearExpiredFormGenerationPromptsFunction = inngest.createFunction(
+  { id: "clear-expired-form-generation-prompts", triggers: [{ cron: "0 4 * * *" }] },
+  async ({ step }) =>
+    step.run("clear-expired-form-generation-prompts", () =>
+      formAiServiceInstance.clearExpiredPrompts(),
+    ),
 );

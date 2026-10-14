@@ -1,11 +1,12 @@
-import { and, db, eq, inArray } from "@repo/database";
-import { form, formGenerationJob } from "@repo/database/models/form-schema";
+import { and, count, db, eq, gte, inArray, lt, sql } from "@repo/database";
+import { form, formField, formGenerationJob } from "@repo/database/models/form-schema";
 import { zodTextFormat } from "openai/helpers/zod";
 
-import FormFieldService from "../form_feild";
+import FormFieldService, { MAX_FORM_FIELDS } from "../form_feild";
 import { getOpenAiClient } from "./client";
 import { formGenerationRequested, inngest } from "./inngest-client";
 import { serviceError } from "../errors";
+import { env } from "../env";
 import {
   formGenerationJobOutput,
   generatedFieldsSchema,
@@ -17,29 +18,78 @@ import {
 } from "./model";
 
 const formFields = new FormFieldService();
+const dailyGenerationQuota = 10;
+const promptRetentionDays = 30;
 export const safeGenerationError = "Form generation failed after multiple attempts. Please try again.";
 
 export default class FormAiService {
   public async startGeneration(input: StartFormGenerationInput, userId: string) {
+    if (!env.OPENAI_API_KEY) {
+      throw serviceError("INTERNAL_SERVER_ERROR", "AI form generation is not configured.");
+    }
     const { formId, prompt } = await startFormGenerationInput.parseAsync(input);
-    const [ownedForm] = await db
-      .select({ id: form.id })
-      .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
-    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+    const now = new Date();
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const job = await db.transaction(async (tx) => {
+      const lockKeys = [
+        `form-generation:form:${formId}`,
+        `form-generation:user:${userId}:${dayStart.toISOString().slice(0, 10)}`,
+      ].sort();
+      for (const key of lockKeys) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+      }
 
-    const [job] = await db
-      .insert(formGenerationJob)
-      .values({ formId, userId, prompt, status: "pending" })
-      .returning({
-        id: formGenerationJob.id,
-        formId: formGenerationJob.formId,
-        status: formGenerationJob.status,
-        error: formGenerationJob.error,
-        createdAt: formGenerationJob.createdAt,
-        updatedAt: formGenerationJob.updatedAt,
-      });
-    if (!job) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to create the form generation job");
+      const [ownedForm] = await tx
+        .select({ id: form.id })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
+      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+
+      const [activeJob] = await tx
+        .select({ id: formGenerationJob.id })
+        .from(formGenerationJob)
+        .where(and(
+          eq(formGenerationJob.formId, formId),
+          inArray(formGenerationJob.status, ["pending", "running"]),
+        ))
+        .limit(1);
+      if (activeJob) throw serviceError("CONFLICT", "A generation job is already active for this form");
+
+      const [dailyJobs] = await tx
+        .select({ count: count() })
+        .from(formGenerationJob)
+        .where(and(
+          eq(formGenerationJob.userId, userId),
+          gte(formGenerationJob.createdAt, dayStart),
+        ));
+      if (!dailyJobs) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the daily generation quota");
+      if (dailyJobs.count >= dailyGenerationQuota) {
+        throw serviceError("TOO_MANY_REQUESTS", "The daily form-generation limit has been reached");
+      }
+
+      const [existingFields] = await tx
+        .select({ count: count() })
+        .from(formField)
+        .where(eq(formField.formId, formId));
+      if (!existingFields) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the form field limit");
+      if (existingFields.count >= MAX_FORM_FIELDS) {
+        throw serviceError("TOO_MANY_REQUESTS", "This form has reached its field limit");
+      }
+
+      const [createdJob] = await tx
+        .insert(formGenerationJob)
+        .values({ formId, userId, prompt, status: "pending" })
+        .returning({
+          id: formGenerationJob.id,
+          formId: formGenerationJob.formId,
+          status: formGenerationJob.status,
+          error: formGenerationJob.error,
+          createdAt: formGenerationJob.createdAt,
+          updatedAt: formGenerationJob.updatedAt,
+        });
+      if (!createdJob) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to create the form generation job");
+      return createdJob;
+    });
 
     try {
       await inngest.send(formGenerationRequested.create({ jobId: job.id }));
@@ -100,7 +150,7 @@ export default class FormAiService {
 
   public async generateFields(prompt: string): Promise<GeneratedFields> {
     const response = await getOpenAiClient().responses.parse({
-      model: process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini",
+      model: env.OPENAI_MODEL,
       input: [
         {
           role: "system",
@@ -190,6 +240,29 @@ export default class FormAiService {
           inArray(formGenerationJob.status, ["pending", "running"]),
         ),
       );
+  }
+
+  public async failStaleJobs() {
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+    const failedJobs = await db
+      .update(formGenerationJob)
+      .set({ status: "failed", error: "Generation timed out. You can safely try again." })
+      .where(and(
+        inArray(formGenerationJob.status, ["pending", "running"]),
+        lt(formGenerationJob.updatedAt, cutoff),
+      ))
+      .returning({ id: formGenerationJob.id });
+    return { count: failedJobs.length };
+  }
+
+  public async clearExpiredPrompts() {
+    const cutoff = new Date(Date.now() - promptRetentionDays * 24 * 60 * 60 * 1000);
+    const expiredPrompts = await db
+      .update(formGenerationJob)
+      .set({ prompt: "" })
+      .where(and(lt(formGenerationJob.createdAt, cutoff), sql`${formGenerationJob.prompt} <> ''`))
+      .returning({ id: formGenerationJob.id });
+    return { count: expiredPrompts.length };
   }
 }
 
