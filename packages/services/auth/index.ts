@@ -1,12 +1,5 @@
 import { auth } from "@repo/database/lib/auth";
-import { form } from "@repo/database/models/form-schema";
-import {
-  SignInInputType,
-  SignUpInputType,
-  updateFormResponseLimit,
-  type UpdateFormResponseLimitType,
-} from "./model";
-import { db, eq } from "@repo/database";
+import { SignInInputType, SignUpInputType } from "./model";
 
 export default class authService {
   public async signIn(input: SignInInputType) {
@@ -25,21 +18,5 @@ export default class authService {
       body: { name, email, password },
     });
     return response;
-  }
-
-  public async updateFormResponseLimit(input: UpdateFormResponseLimitType) {
-    const { formId, userRole, responseLimit } = updateFormResponseLimit.parse(input);
-
-    if (userRole !== "admin") {
-      throw new Error("Unauthorized: Only admin can update form response limit");
-    }
-
-    const [updatedLimit] = await db
-      .update(form)
-      .set({ responseLimit })
-      .where(eq(form.id, formId))
-      .returning({ responseLimit: form.responseLimit });
-
-    return updatedLimit;
   }
 }

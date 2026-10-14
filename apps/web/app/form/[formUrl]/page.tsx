@@ -1,13 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import { StarRating } from "~/components/forms/star-rating";
 import { usePublicForm } from "~/hooks/form/use-public-form";
 import { useSubmission } from "~/hooks/form/use-submission";
+import { toast } from "sonner";
 
 type FormField = {
   id: string;
@@ -45,7 +47,21 @@ export default function PublicFormPage() {
   const [submissionId, setSubmissionId] = useState<string>();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [submitted, setSubmitted] = useState(false);
-  const { startSubmissionAsync, updateDraftAnswerAsync, submitFormAsync, versionQuery, isSubmitting, startError, submitError } = useSubmission(formId, submissionId);
+  const [interactionError, setInteractionError] = useState("");
+  const autosaveTimer = useRef<number | undefined>(undefined);
+  const {
+    startSubmissionAsync,
+    updateDraftAnswerAsync,
+    saveBulkAnswersAsync,
+    submitFormAsync,
+    versionQuery,
+    isSubmitting,
+    isSavingDraft,
+    isSavingAnswers,
+    startError,
+    submitError,
+    answersError,
+  } = useSubmission(formId, submissionId);
   const fields = useMemo(() => getFields(snapshot?.fieldsJson), [snapshot?.fieldsJson]);
 
   useEffect(() => {
@@ -53,41 +69,95 @@ export default function PublicFormPage() {
     const viewKey = `form-viewed:${formId}`;
     if (window.localStorage.getItem(viewKey)) return;
     window.localStorage.setItem(viewKey, "1");
-    void incrementViewAsync({ formId }).catch(() => window.localStorage.removeItem(viewKey));
+    void incrementViewAsync({ formId }).catch(() => {
+      window.localStorage.removeItem(viewKey);
+      toast.error("Unable to record this form view.");
+    });
   }, [form, formId, incrementViewAsync]);
 
   useEffect(() => {
     if (!formId || !form || submissionId) return;
     const storageKey = `form-submission:${formId}`;
     const storedId = window.localStorage.getItem(storageKey) ?? undefined;
-    void startSubmissionAsync({ formId, submissionId: storedId }).then((submission) => {
-      setSubmissionId(submission.id);
-      window.localStorage.setItem(storageKey, submission.id);
-      if (submission.draftAnswer && typeof submission.draftAnswer === "object" && !Array.isArray(submission.draftAnswer)) {
-        setAnswers(submission.draftAnswer as Record<string, unknown>);
-      }
-    });
+    void startSubmissionAsync({ formId, submissionId: storedId })
+      .catch(async () => {
+        if (!storedId) throw new Error("Unable to start this response.");
+        window.localStorage.removeItem(storageKey);
+        return startSubmissionAsync({ formId });
+      })
+      .then((submission) => {
+        setSubmissionId(submission.id);
+        if (submission.status === "submitted") {
+          setSubmitted(true);
+          window.localStorage.removeItem(storageKey);
+          return;
+        }
+        window.localStorage.setItem(storageKey, submission.id);
+        if (submission.draftAnswer && typeof submission.draftAnswer === "object" && !Array.isArray(submission.draftAnswer)) {
+          setAnswers(submission.draftAnswer as Record<string, unknown>);
+        }
+        setInteractionError("");
+      })
+      .catch((error: unknown) => {
+        setInteractionError(error instanceof Error ? error.message : "Unable to start this response.");
+      });
   }, [form, formId, startSubmissionAsync, submissionId]);
 
   useEffect(() => {
     if (!submissionId || submitted) return;
     const timer = window.setTimeout(() => {
-      void updateDraftAnswerAsync({ submissionId, draftAnswer: answers });
+      autosaveTimer.current = undefined;
+      void updateDraftAnswerAsync({ submissionId, draftAnswer: answers }).catch((error: unknown) => {
+        setInteractionError(error instanceof Error ? error.message : "Unable to save your progress.");
+      });
     }, 500);
-    return () => window.clearTimeout(timer);
+    autosaveTimer.current = timer;
+    return () => {
+      window.clearTimeout(timer);
+      if (autosaveTimer.current === timer) autosaveTimer.current = undefined;
+    };
   }, [answers, submissionId, submitted, updateDraftAnswerAsync]);
 
   function updateAnswer(fieldId: string, value: unknown) {
     setAnswers((current) => ({ ...current, [fieldId]: value }));
   }
 
+  function restartAfterVersionChange() {
+    if (!window.confirm("This form changed. Discard your saved draft and start a new response?")) return;
+    window.localStorage.removeItem(`form-submission:${formId}`);
+    setSubmissionId(undefined);
+    setAnswers({});
+    setInteractionError("");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!submissionId) return;
-    await updateDraftAnswerAsync({ submissionId, draftAnswer: answers });
-    await submitFormAsync({ submissionId });
-    setSubmitted(true);
-    window.localStorage.removeItem(`form-submission:${formId}`);
+    const missingRating = fields.some(
+      (field) => {
+        const value = answers[field.id];
+        return field.type === "rating" && field.required &&
+          (typeof value !== "number" || value < 1);
+      },
+    );
+    if (missingRating) {
+      setInteractionError("Please complete the required rating fields.");
+      return;
+    }
+    if (autosaveTimer.current !== undefined) {
+      window.clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = undefined;
+    }
+    setInteractionError("");
+    try {
+      await updateDraftAnswerAsync({ submissionId, draftAnswer: answers });
+      await saveBulkAnswersAsync({ submissionId, answers });
+      await submitFormAsync({ submissionId });
+      setSubmitted(true);
+      window.localStorage.removeItem(`form-submission:${formId}`);
+    } catch (error) {
+      setInteractionError(error instanceof Error ? error.message : "Unable to submit this response.");
+    }
   }
 
   if (!formId) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
@@ -116,11 +186,39 @@ export default function PublicFormPage() {
           if (field.type === "select" || field.type === "multiselect") {
             return <fieldset className="space-y-2" key={field.id}><legend className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</legend>{options.map((option) => <label className="flex items-center gap-2 text-sm" key={option}><input type={field.type === "select" ? "radio" : "checkbox"} name={field.id} value={option} checked={field.type === "select" ? value === option : Array.isArray(value) && value.includes(option)} onChange={(event) => updateAnswer(field.id, field.type === "select" ? option : event.target.checked ? [...(Array.isArray(value) ? value : []), option] : (Array.isArray(value) ? value : []).filter((item) => item !== option))} required={field.required && field.type === "select"} />{option}</label>)}</fieldset>;
           }
+          if (field.type === "rating") {
+            const config = field.config && typeof field.config === "object" && !Array.isArray(field.config)
+              ? field.config as { maxStars?: unknown }
+              : {};
+            const maxStars = typeof config.maxStars === "number" ? config.maxStars : 5;
+            return (
+              <fieldset className="space-y-2" key={field.id}>
+                <legend className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</legend>
+                <StarRating
+                  label={field.label}
+                  maxStars={maxStars}
+                  value={typeof value === "number" ? value : undefined}
+                  onChange={(rating) => updateAnswer(field.id, rating)}
+                />
+              </fieldset>
+            );
+          }
           const inputType = field.type === "email" || field.type === "number" || field.type === "date" ? field.type : "text";
-          return <label className="block space-y-2" key={field.id}><span className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</span><Input type={inputType} required={field.required} value={value == null ? "" : String(value)} onChange={(event) => updateAnswer(field.id, inputType === "number" ? Number(event.target.value) : event.target.value)} /></label>;
+          return <label className="block space-y-2" key={field.id}><span className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</span><Input type={inputType} required={field.required} value={value == null ? "" : String(value)} onChange={(event) => updateAnswer(field.id, inputType === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value)} /></label>;
         })}
-        {startError || submitError || versionQuery.error ? <p className="text-sm text-destructive" role="alert">Unable to submit this response.</p> : null}
-        <Button type="submit" disabled={!submissionId || isSubmitting}>{isSubmitting ? "Submitting..." : "Submit response"}</Button>
+        {interactionError || startError || submitError || answersError || versionQuery.error || versionQuery.data?.mismatch ? (
+          <p className="text-sm text-destructive" role="alert">
+            {interactionError || (versionQuery.data?.mismatch ? "This form has changed. Reload it before submitting." : "Unable to submit this response.")}
+          </p>
+        ) : null}
+        {versionQuery.data?.mismatch ? (
+          <Button type="button" variant="outline" onClick={restartAfterVersionChange}>
+            Start a new response
+          </Button>
+        ) : null}
+        <Button type="submit" disabled={!submissionId || isSubmitting || isSavingDraft || isSavingAnswers || versionQuery.data?.mismatch}>
+          {isSubmitting || isSavingDraft || isSavingAnswers ? "Submitting..." : "Submit response"}
+        </Button>
       </form>
     </main>
   );

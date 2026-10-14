@@ -18,23 +18,44 @@ export function useForm() {
   });
 
   const renameFormMutation = trpc.form.renameForm.useMutation({
-    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
   });
   const updateFormDescriptionMutation = trpc.form.updateFormDescription.useMutation({
-    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
   });
   const deleteFormMutation = trpc.form.deleteForm.useMutation({
     onSuccess: () => utils.form.listFormsByUser.invalidate(),
   });
-  const toggleFormOpenStatusMutation = trpc.form.toggleFormOpenStatus.useMutation({
-    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+  const toggleFormOpenMutation = trpc.form.toggleFormOpen.useMutation({
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
   });
   const incrementFormViewCountMutation = trpc.form.incrementFormViewCount.useMutation();
   const publishFormMutation = trpc.form.publishForm.useMutation({
-    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
   });
   const unpublishFormMutation = trpc.form.unpublishForm.useMutation({
-    onSuccess: () => utils.form.listFormsByUser.invalidate(),
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
+  });
+  const updateFormResponseLimitMutation = trpc.form.updateResponseLimit.useMutation({
+    onSuccess: () => {
+      void utils.form.listFormsByUser.invalidate();
+      void utils.form.getFormById.invalidate();
+    },
   });
 
   return {
@@ -48,8 +69,10 @@ export function useForm() {
     updateFormDescriptionAsync: updateFormDescriptionMutation.mutateAsync,
     deleteForm: deleteFormMutation.mutate,
     deleteFormAsync: deleteFormMutation.mutateAsync,
-    toggleFormOpenStatus: toggleFormOpenStatusMutation.mutate,
-    toggleFormOpenStatusAsync: toggleFormOpenStatusMutation.mutateAsync,
+    toggleFormOpen: toggleFormOpenMutation.mutate,
+    toggleFormOpenAsync: toggleFormOpenMutation.mutateAsync,
+    updateResponseLimit: updateFormResponseLimitMutation.mutate,
+    updateResponseLimitAsync: updateFormResponseLimitMutation.mutateAsync,
     incrementFormViewCount: incrementFormViewCountMutation.mutate,
     incrementFormViewCountAsync: incrementFormViewCountMutation.mutateAsync,
     publishForm: publishFormMutation.mutate,

@@ -6,6 +6,10 @@ import {
   type ListFormFieldsType,
   updateForm,
   type UpdateFormType,
+  reorderFields as reorderFieldsSchema,
+  type ReorderFieldsType,
+  deleteFormField as deleteFormFieldSchema,
+  type DeleteFormFieldType,
 } from "./model";
 import { form, formField } from "@repo/database/models/form-schema";
 
@@ -81,8 +85,8 @@ export default class FormFieldService {
     });
   }
 
-  // use this for drag-and-drop, NOT updateFormField: one drag = one version
-  public async reorderFormFields(formId: string, orderedFieldIds: string[], userId: string) {
+  public async reorderFields(input: ReorderFieldsType) {
+    const { formId, orderedFieldIds, userId } = await reorderFieldsSchema.parseAsync(input);
     await this.validateFormOwnership(formId, userId);
 
     return db.transaction(async (tx) => {
@@ -104,23 +108,30 @@ export default class FormFieldService {
       }
 
       for (const [index, id] of orderedFieldIds.entries()) {
-        await tx
+        const [reorderedField] = await tx
           .update(formField)
           .set({ fieldOrder: index })
-          .where(and(eq(formField.id, id), eq(formField.formId, formId)));
+          .where(and(eq(formField.id, id), eq(formField.formId, formId)))
+          .returning({ id: formField.id });
+        if (!reorderedField) throw new Error("Form field not found during reorder");
       }
 
       return { reordered: orderedFieldIds.length };
     });
   }
 
-  public async deleteFormField(formId: string, fieldId: string, userId: string) {
+  public async reorderFormFields(formId: string, orderedFieldIds: string[], userId: string) {
+    return this.reorderFields({ formId, orderedFieldIds, userId });
+  }
+
+  public async deleteFormField(input: DeleteFormFieldType) {
+    const { formId, formFieldId, userId } = await deleteFormFieldSchema.parseAsync(input);
     await this.validateFormOwnership(formId, userId);
 
     return db.transaction(async (tx) => {
       const [deletedField] = await tx
         .delete(formField)
-        .where(and(eq(formField.id, fieldId), eq(formField.formId, formId)))
+        .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))
         .returning({ id: formField.id });
 
       if (!deletedField) {

@@ -1,4 +1,4 @@
-import { and, asc, db, desc, eq, sql } from "@repo/database";
+import { and, db, desc, eq, sql } from "@repo/database";
 import {
   createInitialForm,
   deleteForm,
@@ -14,13 +14,22 @@ import {
   type RenameFormType,
   updateFormDescription,
   type UpdateFormDescriptionType,
-  toggleFormOpenStatus,
+  toggleFormOpen,
   type ToggleFormOpenStatusType,
-  publicForm,
-  type PublicFormType,
+  type UpdateFormResponseLimitType,
+  updateFormResponseLimit,
+  incrementFormViewCount,
+  type IncrementFormViewCountType,
+  publishForm,
+  type PublishFormType,
+  unpublishForm,
+  type UnpublishFormType,
 } from "./model";
-import { form, formField, formSnapshot } from "@repo/database/models/form-schema";
+import { form } from "@repo/database/models/form-schema";
 import { env } from "../env";
+import FormSnapshotService from "../form_snapshot";
+
+const formSnapshotService = new FormSnapshotService();
 
 export default class FormService {
   private formSelection() {
@@ -30,7 +39,11 @@ export default class FormService {
       description: form.description,
       formUrl: form.formUrl,
       isPublished: form.isPublished,
+      isOpen: form.isOpen,
+      responseLimit: form.responseLimit,
+      views: form.views,
       createdAt: form.createdAt,
+      updatedAt: form.updatedAt,
     };
   }
 
@@ -136,8 +149,8 @@ export default class FormService {
       .orderBy(desc(form.createdAt));
   }
 
-  public async toggleFormOpenStatus(input: ToggleFormOpenStatusType) {
-    const { formId, userId, isOpen } = await toggleFormOpenStatus.parseAsync(input);
+  public async toggleFormOpen(input: ToggleFormOpenStatusType) {
+    const { formId, userId, isOpen } = await toggleFormOpen.parseAsync(input);
 
     const [updatedForm] = await db
       .update(form)
@@ -152,11 +165,39 @@ export default class FormService {
     return updatedForm;
   }
 
-  public async incrementFormViewCount(formId: string) {
+  public async toggleFormOpenStatus(input: ToggleFormOpenStatusType) {
+    return this.toggleFormOpen(input);
+  }
+
+  public async updateResponseLimit(input: UpdateFormResponseLimitType) {
+    const { formId, userRole, responseLimit } = await updateFormResponseLimit.parseAsync(input);
+    if (userRole !== "admin") {
+      throw new Error("Unauthorized: Only admin can update form response limit");
+    }
+
+    const [updatedForm] = await db
+      .update(form)
+      .set({ responseLimit })
+      .where(eq(form.id, formId))
+      .returning({ id: form.id, responseLimit: form.responseLimit });
+
+    if (!updatedForm) {
+      throw new Error("Form not found");
+    }
+
+    return updatedForm;
+  }
+
+  public async updateFormResponseLimit(input: UpdateFormResponseLimitType) {
+    return this.updateResponseLimit(input);
+  }
+
+  public async incrementFormViewCount(input: IncrementFormViewCountType) {
+    const { formId } = await incrementFormViewCount.parseAsync(input);
     const [updatedForm] = await db
       .update(form)
       .set({ views: sql`${form.views} + 1` })
-      .where(eq(form.id, formId))
+      .where(and(eq(form.id, formId), eq(form.isPublished, true)))
       .returning({ id: form.id, views: form.views });
 
     if (!updatedForm) {
@@ -166,13 +207,21 @@ export default class FormService {
     return updatedForm;
   }
 
-  public async publishForm(input: PublicFormType) {
-    const { formId, userId, title } = await publicForm.parseAsync(input);
-
-    const slug = title.replace(/\s+/g, "-").toLowerCase();
-    const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
+  public async publishForm(input: PublishFormType) {
+    const { formId, userId } = await publishForm.parseAsync(input);
 
     return db.transaction(async (tx) => {
+      const [currentForm] = await tx
+        .select({ title: form.title })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)));
+
+      if (!currentForm) {
+        throw new Error("Form not found");
+      }
+
+      const slug = currentForm.title.trim().replace(/\s+/g, "-").toLowerCase();
+      const publishFormURL = `${env.WEB_URL}/form/${formId}-${slug}`;
       const [updatedForm] = await tx
         .update(form)
         .set({
@@ -187,32 +236,21 @@ export default class FormService {
         throw new Error("Form not found");
       }
 
-      const fields = await tx
-        .select()
-        .from(formField)
-        .where(eq(formField.formId, formId))
-        .orderBy(asc(formField.fieldOrder));
-
-      const [snapshot] = await tx
-        .insert(formSnapshot)
-        .values({
+      await formSnapshotService.createSnapshot(
+        {
           formId,
-          versions: updatedForm.currentVersion,
-          fieldsJson: fields,
-        })
-        .returning({ id: formSnapshot.id });
-
-      if (!snapshot) {
-        throw new Error("Failed to create form snapshot");
-      }
+          version: updatedForm.currentVersion,
+        },
+        tx,
+      );
 
       const { currentVersion: _currentVersion, ...publishedForm } = updatedForm;
       return publishedForm;
     });
   }
 
-  public async unpublishForm(input: PublicFormType) {
-    const { formId, userId } = await publicForm.parseAsync(input);
+  public async unpublishForm(input: UnpublishFormType) {
+    const { formId, userId } = await unpublishForm.parseAsync(input);
 
     // check the form's ACTUAL current state in the DB, never trust
     // an isPublished value coming from client input for this decision

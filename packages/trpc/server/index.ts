@@ -6,6 +6,7 @@ import { formRouter } from "./routes/form/route";
 import { formFieldRouter } from "./routes/form-field/route";
 import { formSnapshotRouter } from "./routes/form_snapshot/index";
 import { submissionRouter } from "./routes/submission/route";
+import { answerRouter } from "./routes/answer/route";
 
 export const serverRouter = router({
   health: healthRouter,
@@ -14,6 +15,7 @@ export const serverRouter = router({
   formField: formFieldRouter,
   formSnapshot: formSnapshotRouter,
   submission: submissionRouter,
+  answer: answerRouter,
 
 });
 

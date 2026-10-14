@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { BarChart3, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -14,6 +14,7 @@ export type FormSummary = {
   description?: string | null;
   formUrl?: string | null;
   isPublished: boolean;
+  views?: number;
   createdAt: Date | string;
   updatedAt?: Date | string;
 };
@@ -49,6 +50,9 @@ export function FormCard({ form, fieldCount = 0, onEdit, onDelete, onPublish, on
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}><Pencil />Edit details</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/forms/${form.id}/responses`}><BarChart3 />View responses</Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={copyShareLink} disabled={!form.formUrl}><Copy />Copy share link</DropdownMenuItem>
               {form.isPublished ? <DropdownMenuItem onClick={onUnpublish}>Unpublish</DropdownMenuItem> : <DropdownMenuItem onClick={onPublish}>Publish</DropdownMenuItem>}
               <DropdownMenuItem className="text-destructive" onClick={onDelete}><Trash2 />Delete form</DropdownMenuItem>

@@ -7,6 +7,7 @@ export interface ContextUser {
   session: SessionResponse["session"] | null;
   user: SessionResponse["user"] | null;
   userId: string | null;
+  userRole: string | null;
 }
 
 export async function createContext({
@@ -16,11 +17,13 @@ export async function createContext({
   const authSession = await auth.api.getSession({
     headers: new Headers(req.headers as Record<string, string>),
   });
+  const userId = authSession?.user.id ?? null;
 
   return {
     session: authSession?.session ?? null,
     user: authSession?.user ?? null,
-    userId: authSession?.user.id ?? null,
+    userId,
+    userRole: authSession?.user.role ?? null,
   };
 }
 export type Context = ContextUser;

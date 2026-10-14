@@ -1,12 +1,14 @@
-import { publicProcedure, router } from "../../trpc";
+import { protectedProcedure, publicProcedure, router } from "../../trpc";
 import {
   signInInput,
   signUpInput,
   signInOutput,
-  signUpOutput
+  signUpOutput,
+  currentUserRoleOutput,
 } from "./model";
 import { authServiceInstance } from "../../services";
 import { generatePath } from "../../utils/path-generator";
+import { TRPCError } from "@trpc/server";
 
 const signInPath = generatePath("/");
 const signUpPath = generatePath("/");
@@ -14,6 +16,23 @@ const signUpPath = generatePath("/");
 const TAGS = ["Authentication"];
 
 export const authRouter = router({
+  getCurrentUserRole: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: signInPath("/user-role"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .output(currentUserRoleOutput)
+    .query(({ ctx }) => {
+      if (!ctx.userRole) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User role is unavailable" });
+      }
+      return { userRole: ctx.userRole };
+    }),
+
   signIn: publicProcedure
     .meta({
       openapi: {

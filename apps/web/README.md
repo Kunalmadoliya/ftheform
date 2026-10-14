@@ -24,9 +24,9 @@ Authentication uses the Better Auth session cookie supplied by the API, so the A
 
 ## Frontend Structure
 
-- `app/` contains Next.js routes, including login, sign-up, and dashboard pages.
+- `app/` contains the public form route, builder, dashboard, response review, login, and sign-up pages.
 - `components/` contains auth and shared UI components.
-- `hooks/form/` contains hooks for form and form-field procedures.
+- `hooks/form/` contains hooks for forms, fields, snapshots, submissions, and responses.
 - `hooks/auth/` contains auth procedure hooks and social sign-in helpers.
 - `trpc/` contains the typed browser client and HTTP links.
 

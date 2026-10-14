@@ -5,16 +5,20 @@ import {
   type getFormSnapshotInputType,
   createSnapshotInput,
   type createSnapshotInputType,
+  listSnapshotsByFormInput,
+  type ListSnapshotsByFormInputType,
 } from "./model";
 import { formSnapshot, form, formField } from "@repo/database/models/form-schema";
-import { and, asc, db, desc, eq, sql } from "@repo/database";
+import { and, asc, db, desc, eq } from "@repo/database";
 
-export default class FormSnapshot {
+type SnapshotTransaction = Pick<typeof db, "select" | "insert">;
+
+export default class FormSnapshotService {
   public async getLatestFormSnapshotById(input: getFormSnapshotType) {
     const { formId } = await getLatestFormSnapshotById.parseAsync(input);
 
     const [checkForm] = await db
-      .select({ currentVersion: form.currentVersion })
+      .select({ currentVersion: form.currentVersion, isPublished: form.isPublished })
       .from(form)
       .where(eq(form.id, formId))
       .limit(1);
@@ -22,6 +26,7 @@ export default class FormSnapshot {
     if (!checkForm) {
       throw new Error("Form not found");
     }
+    if (!checkForm.isPublished) throw new Error("Form is not published");
 
     const [snapshot] = await db
       .select()
@@ -35,7 +40,14 @@ export default class FormSnapshot {
   }
 
   public async getLatestFormSnapshot(input: getFormSnapshotInputType) {
-    const { formId, formSnapshotId } = await getLatestFormSnapshotInput.parseAsync(input);
+    const { formId, formSnapshotId, userId } = await getLatestFormSnapshotInput.parseAsync(input);
+
+    const [ownedForm] = await db
+      .select({ id: form.id })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .limit(1);
+    if (!ownedForm) throw new Error("Form not found");
 
     const [checkFormSnapshot] = await db
       .select()
@@ -59,45 +71,38 @@ export default class FormSnapshot {
     return this.getLatestFormSnapshotById(input);
   }
 
-  public async createSnapshot(input: createSnapshotInputType) {
-    const { formId } = await createSnapshotInput.parseAsync(input);
-    return db.transaction(async (tx) => {
-      const [updatedForm] = await tx
-        .update(form)
-        .set({ currentVersion: sql<number>`${form.currentVersion} + 1` })
-        .where(eq(form.id, formId))
-        .returning({ currentVersion: form.currentVersion });
-      if (!updatedForm) throw new Error("Form not found");
-
-      const fields = await tx
-        .select()
-        .from(formField)
-        .where(eq(formField.formId, formId))
-        .orderBy(asc(formField.fieldOrder));
-      const [snapshot] = await tx
-        .insert(formSnapshot)
-        .values({ formId, versions: updatedForm.currentVersion, fieldsJson: fields })
-        .returning();
-      if (!snapshot) throw new Error("Failed to create form snapshot");
-      return snapshot;
-    });
+  public async createSnapshot(input: createSnapshotInputType, tx: SnapshotTransaction) {
+    const { formId, version } = await createSnapshotInput.parseAsync(input);
+    const fields = await tx
+      .select()
+      .from(formField)
+      .where(eq(formField.formId, formId))
+      .orderBy(asc(formField.fieldOrder));
+    const [snapshot] = await tx
+      .insert(formSnapshot)
+      .values({ formId, versions: version, fieldsJson: fields })
+      .returning();
+    if (!snapshot) throw new Error("Failed to create form snapshot");
+    return snapshot;
   }
 
-  public async listFormSnapshots(formId: string) {
-    if (!formId) {
-      throw new Error("Form id is required");
-    }
+  public async listSnapshotsByForm(input: ListSnapshotsByFormInputType) {
+    const { formId, userId } = await listSnapshotsByFormInput.parseAsync(input);
 
-    const snapshots = await db
+    const [ownedForm] = await db
+      .select({ id: form.id })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+    if (!ownedForm) throw new Error("Form not found");
+
+    return db
       .select()
       .from(formSnapshot)
       .where(eq(formSnapshot.formId, formId))
       .orderBy(desc(formSnapshot.createdAt));
+  }
 
-    if (snapshots.length === 0) {
-      throw new Error("No snapshots found for this form");
-    }
-
-    return snapshots;
+  public async listFormSnapshots(formId: string, userId: string) {
+    return this.listSnapshotsByForm({ formId, userId });
   }
 }

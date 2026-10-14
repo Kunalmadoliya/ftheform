@@ -1,4 +1,5 @@
 import { trpc } from "~/trpc/client";
+import { useLatestFormSnapshot } from "~/hooks/form/use-form-snapshots";
 
 export function usePublicForm(formId: string) {
   const utils = trpc.useUtils();
@@ -6,10 +7,7 @@ export function usePublicForm(formId: string) {
     { formId },
     { enabled: Boolean(formId), retry: false },
   );
-  const snapshotQuery = trpc.formSnapshot.getLatestSnapshot.useQuery(
-    { formId },
-    { enabled: Boolean(formId) && Boolean(formQuery.data?.isPublished), retry: false },
-  );
+  const snapshotQuery = useLatestFormSnapshot(formId, Boolean(formQuery.data?.isPublished));
   const incrementViewMutation = trpc.form.incrementFormViewCount.useMutation();
 
   return {

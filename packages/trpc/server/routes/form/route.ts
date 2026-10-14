@@ -17,8 +17,10 @@ import {
   updateFormOutput,
   unpublishFormInput,
   unpublishFormOutput,
-  toggleFormOpenStatusInput,
-  toggleFormOpenStatusOutput,
+  toggleFormOpenInput,
+  toggleFormOpenOutput,
+  updateResponseLimitInput,
+  updateResponseLimitOutput,
 } from "./model";
 import { formServiceInstance } from "../../services";
 import { generatePath } from "../../utils/path-generator";
@@ -155,7 +157,7 @@ export const formRouter = {
       }),
     ),
 
-  toggleFormOpenStatus: protectedProcedure
+  toggleFormOpen: protectedProcedure
     .meta({
       openapi: {
         method: "PATCH",
@@ -164,12 +166,30 @@ export const formRouter = {
         protect: true,
       },
     })
-    .input(toggleFormOpenStatusInput)
-    .output(toggleFormOpenStatusOutput)
+    .input(toggleFormOpenInput)
+    .output(toggleFormOpenOutput)
     .mutation(({ ctx, input }) =>
-      formServiceInstance.toggleFormOpenStatus({
+      formServiceInstance.toggleFormOpen({
         ...input,
         userId: ctx.userId,
+      }),
+    ),
+
+  updateResponseLimit: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: formsPath("/:formId/response-limit"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(updateResponseLimitInput)
+    .output(updateResponseLimitOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.updateResponseLimit({
+        ...input,
+        userRole: ctx.userRole ?? "",
       }),
     ),
 
@@ -183,7 +203,7 @@ export const formRouter = {
     })
     .input(incrementFormViewCountInput)
     .output(incrementFormViewCountOutput)
-    .mutation(({ input }) => formServiceInstance.incrementFormViewCount(input.formId)),
+    .mutation(({ input }) => formServiceInstance.incrementFormViewCount(input)),
 
   publishForm: protectedProcedure
     .meta({
@@ -200,7 +220,6 @@ export const formRouter = {
       formServiceInstance.publishForm({
         ...input,
         userId: ctx.userId,
-        isPublished: true,
       }),
     ),
 
@@ -219,8 +238,6 @@ export const formRouter = {
       formServiceInstance.unpublishForm({
         ...input,
         userId: ctx.userId,
-        isPublished: false,
-        title: "",
       }),
     ),
 };

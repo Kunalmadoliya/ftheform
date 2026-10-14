@@ -16,11 +16,14 @@ import { Textarea } from "~/components/ui/textarea";
 import { ThemeToggle } from "~/components/theme-toggle";
 import { useForm } from "~/hooks/form/use-form";
 import { authClient } from "~/lib/auth-client";
+import Link from "next/link";
+import { useSubmissionsAcrossForms } from "~/hooks/form/use-submissions-across-forms";
 
-export function DashboardPage() {
+export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean }) {
   const router = useRouter();
   const { data: session, isPending: isSessionPending } = authClient.useSession();
   const { createFormAsync, deleteFormAsync, forms, formsQuery, isPending, renameFormAsync, updateFormDescriptionAsync, publishFormAsync, unpublishFormAsync } = useForm();
+  const submissionData = useSubmissionsAcrossForms(forms.map(({ id, title }) => ({ id, title })));
   const [dialog, setDialog] = useState<"edit" | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -56,22 +59,41 @@ export function DashboardPage() {
   }
 
   async function handleDelete(formId: string) {
-    if (window.confirm("Delete this form? This cannot be undone.")) await deleteFormAsync({ formId });
+    if (!window.confirm("Delete this form? This cannot be undone.")) return;
+    try {
+      await deleteFormAsync({ formId });
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete the form.");
+    }
   }
 
   async function handlePublish(formId: string) {
-    const form = forms.find((item) => item.id === formId);
-    if (form) await publishFormAsync({ formId, title: form.title });
+    try {
+      await publishFormAsync({ formId });
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : "Unable to publish the form.");
+    }
   }
 
   async function handleUnpublish(formId: string) {
-    await unpublishFormAsync({ formId });
+    try {
+      await unpublishFormAsync({ formId });
+    } catch (unpublishError) {
+      setError(unpublishError instanceof Error ? unpublishError.message : "Unable to unpublish the form.");
+    }
   }
 
   async function handleSignOut() { await authClient.signOut(); router.replace("/"); }
   if (isSessionPending || !session?.user) return null;
 
   const formSummaries = forms as FormSummary[];
+  const visibleForms = showAllForms ? formSummaries : formSummaries.slice(0, 3);
+  const totalResponses = submissionData.entries.reduce(
+    (total, entry) => total + entry.submissions.length,
+    0,
+  );
+  const totalViews = forms.reduce((total, form) => total + form.views, 0);
+  const responseRate = totalViews > 0 ? Math.round((totalResponses / totalViews) * 100) : 0;
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -83,19 +105,23 @@ export function DashboardPage() {
         </header>
         <div className="mx-auto max-w-7xl space-y-10 px-6 py-10 lg:px-10">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><p className="text-sm text-muted-foreground">Welcome back, {session.user.name}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Dashboard</h1></div>
+            <div><p className="text-sm text-muted-foreground">Welcome back, {session.user.name}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{showAllForms ? "All forms" : "Dashboard"}</h1></div>
             <Button onClick={() => void handleCreateForm()} disabled={isPending}><FilePlus2 />{isPending ? "Creating..." : "New form"}</Button>
           </div>
+          {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {/* These workspace stats have no backend source yet, so keep them clearly as placeholders. */}
             <StatCard label="Total forms" value={String(forms.length)} detail="In your workspace" />
             <StatCard label="Published" value={String(forms.filter((form) => form.isPublished).length)} detail="Currently live" />
-            <StatCard label="Responses" value="-" detail="Response analytics coming soon" />
-            <StatCard label="This week" value="-" detail="Response analytics coming soon" />
+            <StatCard label="Responses" value={String(totalResponses)} detail="Submitted responses" />
+            <StatCard label="Response rate" value={`${responseRate}%`} detail={`${totalViews} total views`} />
           </div>
           <section className="space-y-4">
-            <div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold">Your forms</h2><p className="mt-1 text-sm text-muted-foreground">Create, edit, and share your forms.</p></div>{formsQuery.isPending ? <span className="text-sm text-muted-foreground">Loading...</span> : null}</div>
-            <FormsGrid forms={formSummaries} onEdit={openEdit} onDelete={handleDelete} onPublish={handlePublish} onUnpublish={handleUnpublish} />
+            <div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold">{showAllForms ? "Your forms" : "Recent forms"}</h2><p className="mt-1 text-sm text-muted-foreground">Create, edit, and share your forms.</p></div><div className="flex items-center gap-3">{formsQuery.isPending ? <span className="text-sm text-muted-foreground">Loading...</span> : null}{!showAllForms ? <Link href="/forms" className="text-sm font-medium text-primary hover:underline">View all →</Link> : null}</div></div>
+            {formsQuery.isError ? (
+              <p className="text-sm text-destructive" role="alert">Unable to load your forms.</p>
+            ) : (
+              <FormsGrid forms={visibleForms} onEdit={openEdit} onDelete={handleDelete} onPublish={handlePublish} onUnpublish={handleUnpublish} />
+            )}
           </section>
         </div>
       </main>

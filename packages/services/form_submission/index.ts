@@ -1,5 +1,6 @@
 import { form, formSnapshot, submission } from "@repo/database/schema";
-import { and, db, desc, eq } from "@repo/database";
+import { and, count, db, desc, eq } from "@repo/database";
+import { z } from "zod";
 import {
   validateSubmittedFormVersion,
   type validateSubmittedFormVersionType,
@@ -21,15 +22,17 @@ import {
   type listSubmissionsByUserSchemaType,
   markNotSubmittedSchema,
   type markNotSubmittedSchemaType,
+  deleteSubmissionSchema,
+  type deleteSubmissionSchemaType,
 } from "./model";
 
-export default class FormSubmission {
+export default class SubmissionService {
   private validateDraftAgainstSnapshot(fieldsJson: unknown, draftAnswer: unknown) {
-    const fields = Array.isArray(fieldsJson)
-      ? fieldsJson.filter((field): field is { id: string; required?: boolean } =>
-          Boolean(field && typeof field === "object" && typeof (field as { id?: unknown }).id === "string"),
-        )
-      : [];
+    const parsedFields = z
+      .array(z.object({ id: z.string(), required: z.boolean(), type: z.string() }))
+      .safeParse(fieldsJson);
+    if (!parsedFields.success) throw new Error("Form snapshot fields are invalid");
+    const fields = parsedFields.data;
     const draft = draftAnswer && typeof draftAnswer === "object" && !Array.isArray(draftAnswer)
       ? draftAnswer as Record<string, unknown>
       : {};
@@ -42,6 +45,9 @@ export default class FormSubmission {
       const value = draft[field.id];
       const empty = value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
       if (field.required && empty) throw new Error(`Field ${field.id} is required`);
+      if (field.required && field.type === "checkbox" && value !== true) {
+        throw new Error(`Field ${field.id} must be checked`);
+      }
     }
   }
 
@@ -53,6 +59,7 @@ export default class FormSubmission {
         currentVersion: form.currentVersion,
         isPublished: form.isPublished,
         isOpen: form.isOpen,
+        responseLimit: form.responseLimit,
       })
       .from(form)
       .where(eq(form.id, formId));
@@ -83,7 +90,7 @@ export default class FormSubmission {
   public async startSubmissionForm(input: startSubmissionFormSchemaType) {
     const { formId, submissionId, userId } = await startSubmissionFormSchema.parseAsync(input);
 
-    const { snapshot } = await this.validateFormVersion({ formId });
+    const { form, snapshot } = await this.validateFormVersion({ formId });
 
     if (submissionId) {
       const [existing] = await db
@@ -91,8 +98,17 @@ export default class FormSubmission {
         .from(submission)
         .where(and(eq(submission.id, submissionId), eq(submission.formId, formId)));
       if (!existing) throw new Error("Submission not found");
-      if (userId && existing.userId !== userId) throw new Error("Submission not found");
+      if (existing.userId !== (userId ?? null)) throw new Error("Submission not found");
       return existing;
+    }
+
+    const [submittedResult] = await db
+      .select({ submittedCount: count() })
+      .from(submission)
+      .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")));
+    if (!submittedResult) throw new Error("Unable to check the form response limit");
+    if (submittedResult.submittedCount >= form.responseLimit) {
+      throw new Error("This form has reached its response limit");
     }
 
     const [newSubmission] = await db
@@ -141,7 +157,10 @@ export default class FormSubmission {
       .from(submission)
       .where(and(eq(submission.id, submissionId), formId ? eq(submission.formId, formId) : undefined));
 
-    if (!submissionRecord || (userId && submissionRecord.userId !== userId)) {
+    if (
+      !submissionRecord ||
+      (userId !== undefined && submissionRecord.userId !== (userId ?? null))
+    ) {
       throw new Error("Submission not found");
     }
     return submissionRecord;
@@ -166,11 +185,12 @@ export default class FormSubmission {
 
   public async updateLastActivity(input: updateLastActivitySchemaType) {
     const { submissionId, userId } = await updateLastActivitySchema.parseAsync(input);
-    await this.getSubmissionById({ submissionId, userId });
+    const existing = await this.getSubmissionById({ submissionId, userId });
+    if (existing.status !== "filling") throw new Error("Submission is already finalized");
     const [updatedSubmission] = await db
       .update(submission)
       .set({ lastActivity: new Date() })
-      .where(eq(submission.id, submissionId))
+      .where(and(eq(submission.id, submissionId), eq(submission.status, "filling")))
       .returning();
     if (!updatedSubmission) throw new Error("Submission not found");
     return updatedSubmission;
@@ -181,9 +201,18 @@ export default class FormSubmission {
     const existing = await this.getSubmissionById({ submissionId, userId });
     if (existing.status !== "filling") throw new Error("Submission is already finalized");
 
-    const { snapshot } = await this.validateFormVersion({ formId: existing.formId });
+    const { form, snapshot } = await this.validateFormVersion({ formId: existing.formId });
     if (existing.snapshotId !== snapshot.id) throw new Error("Submission version is out of date");
     this.validateDraftAgainstSnapshot(snapshot.fieldsJson, existing.draftAnswer);
+
+    const [submittedResult] = await db
+      .select({ submittedCount: count() })
+      .from(submission)
+      .where(and(eq(submission.formId, existing.formId), eq(submission.status, "submitted")));
+    if (!submittedResult) throw new Error("Unable to check the form response limit");
+    if (submittedResult.submittedCount >= form.responseLimit) {
+      throw new Error("This form has reached its response limit");
+    }
 
     const [updatedSubmission] = await db
       .update(submission)
@@ -209,7 +238,7 @@ export default class FormSubmission {
     return db
       .select()
       .from(submission)
-      .where(eq(submission.formId, formId))
+      .where(and(eq(submission.formId, formId), eq(submission.status, "submitted")))
       .orderBy(desc(submission.startedAt));
   }
 
@@ -240,10 +269,24 @@ export default class FormSubmission {
     return updatedSubmission;
   }
 
-  public async deleteSubmission(input: submissionLookupSchemaType) {
-    const { submissionId, userId } = await submissionLookupSchema.parseAsync(input);
-    await this.getSubmissionById({ submissionId, userId });
-    const [deletedSubmission] = await db.delete(submission).where(eq(submission.id, submissionId)).returning({ id: submission.id });
+  public async deleteSubmission(input: deleteSubmissionSchemaType) {
+    const { submissionId, userId } = await deleteSubmissionSchema.parseAsync(input);
+    const [existingSubmission] = await db
+      .select({ userId: submission.userId, formOwnerId: form.userId })
+      .from(submission)
+      .innerJoin(form, eq(submission.formId, form.id))
+      .where(eq(submission.id, submissionId))
+      .limit(1);
+    if (
+      !existingSubmission ||
+      (existingSubmission.userId !== userId && existingSubmission.formOwnerId !== userId)
+    ) {
+      throw new Error("Submission not found");
+    }
+    const [deletedSubmission] = await db
+      .delete(submission)
+      .where(eq(submission.id, submissionId))
+      .returning({ id: submission.id });
     if (!deletedSubmission) throw new Error("Submission not found");
     return deletedSubmission;
   }

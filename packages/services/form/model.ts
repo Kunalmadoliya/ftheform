@@ -58,20 +58,31 @@ export const toggleFormOpenStatus = z.object({
 
 export type ToggleFormOpenStatusType = z.infer<typeof toggleFormOpenStatus>;
 
+export const toggleFormOpen = toggleFormOpenStatus;
+export type ToggleFormOpenType = ToggleFormOpenStatusType;
+
 export const updateFormResponseLimit = z.object({
   formId: z.string().describe("form id"),
-  userId: z.string().describe("user id"),
+  userRole: z.string().describe("authenticated user role"),
   responseLimit: z.number().int().min(1).describe("new form response limit"),
 });
 
 export type UpdateFormResponseLimitType = z.infer<typeof updateFormResponseLimit>;
+export const updateResponseLimit = updateFormResponseLimit;
+export type UpdateResponseLimitType = UpdateFormResponseLimitType;
 
-
-export const publicForm = z.object({
+export const incrementFormViewCount = z.object({
   formId: z.string().describe("form id"),
-  userId: z.string().describe("user id"),
-  isPublished: z.boolean().describe("new form published status"),
-  title: z.string().describe("form title"),
 });
 
-export type PublicFormType = z.infer<typeof publicForm>;
+export type IncrementFormViewCountType = z.infer<typeof incrementFormViewCount>;
+
+export const publishForm = z.object({
+  formId: z.string().describe("form id"),
+  userId: z.string().describe("user id"),
+});
+
+export type PublishFormType = z.infer<typeof publishForm>;
+
+export const unpublishForm = publishForm;
+export type UnpublishFormType = PublishFormType;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useRef, useState, type DragEvent } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { Button } from "~/components/ui/button";
@@ -30,6 +30,8 @@ type FormCanvasProps = {
   onSelect: (field: BuilderField) => void;
   onEdit: (field: BuilderField) => void;
   onDelete: (field: BuilderField) => void;
+  onMove: (field: BuilderField, direction: -1 | 1) => void;
+  onReorder: (orderedFieldIds: string[]) => void;
   onAdd: () => void;
 };
 
@@ -45,9 +47,31 @@ export function FormCanvas({
   onSelect,
   onEdit,
   onDelete,
+  onMove,
+  onReorder,
   onAdd,
 }: FormCanvasProps) {
   const [detailsOpen, setDetailsOpen] = useState(!title.trim());
+  const draggedFieldId = useRef<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  function handleDrop(event: DragEvent<HTMLDivElement>, targetFieldId: string) {
+    event.preventDefault();
+    const sourceFieldId = draggedFieldId.current ?? event.dataTransfer.getData("text/plain");
+    draggedFieldId.current = null;
+    setDropTargetId(null);
+    if (!sourceFieldId || sourceFieldId === targetFieldId) return;
+
+    const orderedFields = [...fields];
+    const sourceIndex = orderedFields.findIndex((field) => field.id === sourceFieldId);
+    const targetIndex = orderedFields.findIndex((field) => field.id === targetFieldId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [draggedField] = orderedFields.splice(sourceIndex, 1);
+    if (!draggedField) return;
+    orderedFields.splice(targetIndex, 0, draggedField);
+    onReorder(orderedFields.map((field) => field.id));
+  }
 
   return (
     <section className="min-w-0 flex-1 bg-muted/30 p-6 lg:p-10">
@@ -96,14 +120,40 @@ export function FormCanvas({
               </CardContent>
             </Card>
           ) : (
-            fields.map((field) => (
+            fields.map((field, index) => (
               <Card
                 key={field.id}
-                className={`w-full cursor-pointer ${selectedFieldId === field.id ? "ring-2 ring-ring" : ""}`}
+                className={`w-full cursor-pointer ${selectedFieldId === field.id ? "ring-2 ring-ring" : ""} ${dropTargetId === field.id ? "border-primary" : ""}`}
+                onDragOver={(event) => {
+                  if (draggedFieldId.current) event.preventDefault();
+                }}
+                onDragLeave={() => setDropTargetId((current) => current === field.id ? null : current)}
+                onDrop={(event) => handleDrop(event, field.id)}
                 onClick={() => onSelect(field)}
               >
                 <CardContent className="flex items-center gap-3 p-3">
-                  <GripVertical className="size-5 shrink-0 text-muted-foreground" />
+                  <span
+                    draggable
+                    className="flex size-8 shrink-0 cursor-grab items-center justify-center text-muted-foreground active:cursor-grabbing"
+                    aria-label={`Drag to reorder ${field.label}`}
+                    onDragStart={(event) => {
+                      draggedFieldId.current = field.id;
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", field.id);
+                    }}
+                    onDragEnd={() => {
+                      draggedFieldId.current = null;
+                      setDropTargetId(null);
+                    }}
+                    onDragEnter={(event) => {
+                      if (draggedFieldId.current && draggedFieldId.current !== field.id) {
+                        event.preventDefault();
+                        setDropTargetId(field.id);
+                      }
+                    }}
+                  >
+                    <GripVertical className="size-5" />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-base font-medium">{field.label}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
@@ -112,6 +162,32 @@ export function FormCanvas({
                     </span>
                   </span>
                   <span className="flex shrink-0 gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={index === 0}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMove(field, -1);
+                      }}
+                      aria-label={`Move ${field.label} up`}
+                    >
+                      <ArrowUp />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={index === fields.length - 1}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMove(field, 1);
+                      }}
+                      aria-label={`Move ${field.label} down`}
+                    >
+                      <ArrowDown />
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"

@@ -16,7 +16,7 @@ export function useFormFields(formId: string) {
   const deleteFieldMutation = trpc.formField.deleteFormField.useMutation({
     onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
   });
-  const reorderFieldMutation = trpc.formField.reorderFormFields.useMutation({
+  const reorderFieldMutation = trpc.formField.reorderFields.useMutation({
     onSuccess: () => utils.formField.listFormFields.invalidate({ formId }),
   });
 

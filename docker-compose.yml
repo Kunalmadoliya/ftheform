@@ -22,7 +22,8 @@ services:
       dockerfile: apps/api/Dockerfile
       target: migrator
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL with host postgresdb in .env}
+      NODE_ENV: production
+      PROD_DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
@@ -44,7 +45,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL with host postgresdb in .env}
+      PROD_DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}

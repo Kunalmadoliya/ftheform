@@ -84,10 +84,14 @@ export const formFieldRouter = {
     .input(deleteFormFieldInput)
     .output(deleteFormFieldOutput)
     .mutation(({ ctx, input }) =>
-      formFieldServiceInstance.deleteFormField(input.formId, input.formFieldId, ctx.user.id),
+      formFieldServiceInstance.deleteFormField({
+        formId: input.formId,
+        formFieldId: input.formFieldId,
+        userId: ctx.user.id,
+      }),
     ),
 
-  reorderFormFields: authenticatedProcedure
+  reorderFields: authenticatedProcedure
     .meta({
       openapi: {
         method: "PATCH",
@@ -99,6 +103,10 @@ export const formFieldRouter = {
     .input(reorderFormFieldsInput)
     .output(reorderFormFieldsOutput)
     .mutation(({ ctx, input }) =>
-      formFieldServiceInstance.reorderFormFields(input.formId, input.orderedFieldIds, ctx.user.id),
+        formFieldServiceInstance.reorderFields({
+          formId: input.formId,
+          orderedFieldIds: input.orderedFieldIds,
+          userId: ctx.user.id,
+        }),
     ),
 };

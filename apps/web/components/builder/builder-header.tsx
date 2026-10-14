@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, Globe2 } from "lucide-react";
+import { ArrowLeft, Check, Eye, Globe2, Send } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -13,10 +13,23 @@ type BuilderHeaderProps = {
   onTitleSave: () => void;
   onPreview: () => void;
   onShare: () => void;
+  onPublish: () => void;
+  isPublished: boolean;
+  isPublishing: boolean;
   savedAt?: string;
 };
 
-export function BuilderHeader({ title, onTitleChange, onTitleSave, onPreview, onShare, savedAt }: BuilderHeaderProps) {
+export function BuilderHeader({
+  title,
+  onTitleChange,
+  onTitleSave,
+  onPreview,
+  onShare,
+  onPublish,
+  isPublished,
+  isPublishing,
+  savedAt,
+}: BuilderHeaderProps) {
   return (
     <header className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-3">
       <Button asChild variant="ghost" size="icon" aria-label="Back to dashboard">
@@ -40,6 +53,10 @@ export function BuilderHeader({ title, onTitleChange, onTitleSave, onPreview, on
         <Button variant="outline" size="sm" onClick={onPreview}>
           <Eye />
           Preview
+        </Button>
+        <Button variant="outline" size="sm" onClick={onPublish} disabled={isPublishing}>
+          <Send />
+          {isPublishing ? "Publishing..." : isPublished ? "Republish" : "Publish"}
         </Button>
         <Button size="sm" onClick={onShare}>
           <Globe2 />

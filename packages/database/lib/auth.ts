@@ -7,7 +7,7 @@ import * as schema from "../auth-schema";
 import { db } from "../index";
 
 export const auth = betterAuth({
-  baseURL: env.BASE_URL, // 👈 add this — must be your API server's URL, e.g. http://localhost:8000
+  baseURL: env.BASE_URL  , // 👈 add this — must be your API server's URL, e.g. http://localhost:4000
   trustedOrigins: ["http://localhost:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -17,6 +17,15 @@ export const auth = betterAuth({
     enabled: true,
      autoSignIn: false,
     requireEmailVerification: true,
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+    },
   },
   socialProviders: {
     github: {

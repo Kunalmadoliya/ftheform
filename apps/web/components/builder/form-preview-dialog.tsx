@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Star } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import type { BuilderField } from "~/components/builder/form-canvas";
+import { StarRating } from "~/components/forms/star-rating";
 
 type FormPreviewDialogProps = {
   open: boolean;
@@ -78,26 +79,13 @@ function PreviewField({ field }: { field: BuilderField }) {
   }
   if (field.type === "rating") {
     const maxStars = typeof config.maxStars === "number" ? config.maxStars : 5;
-    const rating = Number(value);
     return (
-      <div className="flex gap-1" aria-label={`Rating for ${field.label}`}>
-        {Array.from({ length: maxStars }, (_, index) => {
-          const star = index + 1;
-          return (
-            <Button
-              key={star}
-              type="button"
-              variant="outline"
-              size="icon"
-              className={star <= rating ? "text-primary" : "text-muted-foreground"}
-              onClick={() => setValue(String(star))}
-              aria-label={`${star} stars`}
-            >
-              <Star className={star <= rating ? "fill-current" : ""} />
-            </Button>
-          );
-        })}
-      </div>
+      <StarRating
+        label={field.label}
+        maxStars={maxStars}
+        value={value ? Number(value) : undefined}
+        onChange={(rating) => setValue(String(rating))}
+      />
     );
   }
   const inputType =

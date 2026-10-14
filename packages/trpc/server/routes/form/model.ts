@@ -6,7 +6,11 @@ const formOutput = z.object({
   description: z.string().nullable(),
   formUrl: z.string(),
   isPublished: z.boolean(),
+  isOpen: z.boolean(),
+  responseLimit: z.number(),
+  views: z.number(),
   createdAt: z.date(),
+  updatedAt: z.date(),
 });
 
 export const createInitialFormInput = z.object({
@@ -48,12 +52,25 @@ export const deleteFormOutput = z.object({
 
 export const listFormsByUserOutput = z.array(getFormByIdOutput);
 
-export const toggleFormOpenStatusInput = z.object({
+export const toggleFormOpenInput = z.object({
   formId: z.string().describe("The id of the form"),
   isOpen: z.boolean().describe("The new open status of the form"),
 });
 
-export const toggleFormOpenStatusOutput = getFormByIdOutput;
+export const toggleFormOpenOutput = getFormByIdOutput;
+
+export const updateFormResponseLimitInput = z.object({
+  formId: z.string().describe("The id of the form"),
+  responseLimit: z.number().int().min(1),
+});
+
+export const updateFormResponseLimitOutput = z.object({
+  id: z.string(),
+  responseLimit: z.number(),
+});
+
+export const updateResponseLimitInput = updateFormResponseLimitInput;
+export const updateResponseLimitOutput = updateFormResponseLimitOutput;
 
 export const incrementFormViewCountInput = z.object({
   formId: z.string().describe("The id of the form"),
@@ -66,7 +83,6 @@ export const incrementFormViewCountOutput = z.object({
 
 export const publishFormInput = z.object({
   formId: z.string().describe("The id of the form"),
-  title: z.string().describe("The title of the form"),
 });
 
 export const publishFormOutput = formOutput;

@@ -39,3 +39,6 @@ export const signInOutput = z.object({
   }),
 });
 
+export const currentUserRoleOutput = z.object({
+  userRole: z.string(),
+});

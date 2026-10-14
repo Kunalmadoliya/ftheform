@@ -10,6 +10,7 @@ import {
   submissionOutputSchema,
   submissionsOutputSchema,
   versionMismatchInput,
+  deleteSubmissionOutput,
 } from "./model";
 
 const submissionsPath = generatePath("/submission");
@@ -94,4 +95,22 @@ export const submissionRouter = {
     .meta({ openapi: { method: "GET", path: submissionsPath("/user"), tags: TAGS, protect: true } })
     .output(submissionsOutputSchema)
     .query(({ ctx }) => formSubmissionServiceInstance.listSubmissionsByUser({ userId: ctx.userId })),
+
+  deleteSubmission: protectedProcedure
+    .meta({
+      openapi: {
+        method: "DELETE",
+        path: submissionsPath("/:submissionId"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(submissionIdInput)
+    .output(deleteSubmissionOutput)
+    .mutation(({ ctx, input }) =>
+      formSubmissionServiceInstance.deleteSubmission({
+        ...input,
+        userId: ctx.userId,
+      }),
+    ),
 };

@@ -1,4 +1,4 @@
-import { protectedProcedure, publicProcedure } from "../../trpc";
+import { authenticatedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 import { formSnapshotServiceInstance } from "../../services";
 import { generatePath } from "../../utils/path-generator";
 import {
@@ -18,11 +18,18 @@ export const formSnapshotRouter = {
     .output(snapshotOutputSchema)
     .query(({ input }) => formSnapshotServiceInstance.getLatestSnapshot(input)),
 
-  getSnapshotById: publicProcedure
-    .meta({ openapi: { method: "GET", path: snapshotsPath("/:formSnapshotId"), tags: TAGS } })
+  getSnapshotById: authenticatedProcedure
+    .meta({
+      openapi: { method: "GET", path: snapshotsPath("/:formSnapshotId"), tags: TAGS, protect: true },
+    })
     .input(snapshotByIdInput)
     .output(snapshotOutputSchema)
-    .query(({ input }) => formSnapshotServiceInstance.getSnapshotById(input)),
+    .query(({ ctx, input }) =>
+      formSnapshotServiceInstance.getSnapshotById({
+        ...input,
+        userId: ctx.user.id,
+      }),
+    ),
 
   listSnapshotsByForm: protectedProcedure
     .meta({
@@ -30,5 +37,10 @@ export const formSnapshotRouter = {
     })
     .input(snapshotByFormInput)
     .output(snapshotsOutputSchema)
-    .query(({ input }) => formSnapshotServiceInstance.listFormSnapshots(input.formId)),
+    .query(({ ctx, input }) =>
+      formSnapshotServiceInstance.listSnapshotsByForm({
+        ...input,
+        userId: ctx.userId,
+      }),
+    ),
 };
