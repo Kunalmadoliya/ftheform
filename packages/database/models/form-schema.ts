@@ -10,10 +10,11 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { user } from "../auth-schema";
 import { relations } from "drizzle-orm";
 
-export const formStatus = pgEnum("status", ["filling", "submitted", "not_submitted"]);
+export const submissionStatus = pgEnum("submission_status", ["filling", "submitted", "not_submitted"]);
 export const formAccessPolicy = pgEnum("form_access_policy", [
   "anonymous_and_authenticated",
   "anonymous_only",
@@ -67,7 +68,9 @@ export const formSnapshot = pgTable(
     fieldsJson: jsonb("fields_json").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [index("form_snapshot_idx").on(table.formId)],
+  (table) => [
+    uniqueIndex("form_snapshot_form_version_unique_idx").on(table.formId, table.versions),
+  ],
 );
 
 export const formView = pgTable(
@@ -144,9 +147,8 @@ export const submission = pgTable(
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     respondentId: text("respondent_id"),
 
-    status: formStatus("status").notNull().default("filling"),
+    status: submissionStatus("status").notNull().default("filling"),
     draftAnswer: jsonb("draft_answer"),
-    legacyAllowMultipleSubmissions: boolean("allow_multiple_submit").default(false),
     startedAt: timestamp("started_at").notNull().defaultNow(),
     lastActivity: timestamp("last_activity").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
@@ -156,8 +158,16 @@ export const submission = pgTable(
   },
   (table) => [
     index("submission_formId_idx").on(table.formId),
+    index("submission_snapshot_idx").on(table.snapshotId),
+    index("submission_form_status_idx").on(table.formId, table.status),
     index("submission_userId_idx").on(table.userId),
     index("submission_respondentId_idx").on(table.respondentId),
+    uniqueIndex("submission_filling_form_user_unique_idx")
+      .on(table.formId, table.userId)
+      .where(sql`${table.status} = 'filling' AND ${table.userId} IS NOT NULL`),
+    uniqueIndex("submission_filling_form_respondent_unique_idx")
+      .on(table.formId, table.respondentId)
+      .where(sql`${table.status} = 'filling' AND ${table.respondentId} IS NOT NULL`),
   ],
 );
 
@@ -173,7 +183,10 @@ export const answer = pgTable(
     value: jsonb("value"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [index("answer_submissionId_idx").on(table.submissionId)],
+  (table) => [
+    index("answer_submissionId_idx").on(table.submissionId),
+    uniqueIndex("answer_submission_field_key_unique_idx").on(table.submissionId, table.fieldKey),
+  ],
 );
 
 export const formRelation = relations(form, ({ one, many }) => ({
