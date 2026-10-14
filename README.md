@@ -92,7 +92,9 @@ Deploy `apps/web` to Vercel and `apps/api` to Render, building both from the rep
 - `NEXT_PUBLIC_WEB_URL=https://ftheform.vercel.app`
 - `NEXT_PUBLIC_API_URL=https://<RENDER_API_URL>/trpc`
 
-Set these API environment variables in Render (Render provides `PORT`; use the database connection string provisioned for the API):
+Create a PostgreSQL database in Neon and copy its connection string from the Neon dashboard. Keep Neon’s required TLS option (usually `sslmode=require`) in that value. Set the string as `DATABASE_URL` in both Render and any environment used to run production migrations. Do not commit it or put it in a `NEXT_PUBLIC_*` variable.
+
+Set these API environment variables in Render (Render provides `PORT`; `DATABASE_URL` is the Neon connection string):
 
 - `NODE_ENV=production`
 - `PORT` (provided by Render)
@@ -107,6 +109,8 @@ Register these OAuth callback URLs with the providers:
 
 - `https://<RENDER_API_URL>/api/auth/callback/google`
 - `https://<RENDER_API_URL>/api/auth/callback/github`
+
+For local development, keep `DEV_DATABASE_URL` in your existing `.env`; the app selects it when `NODE_ENV=development`. For production, Render should use `DATABASE_URL` directly. Drizzle tooling also accepts `PROD_DATABASE_URL` when `NODE_ENV=production`, which is useful for the existing Compose setup. To explicitly run a migration against Neon from PowerShell, set `$env:DATABASE_URL` to the Neon connection string in that shell before `pnpm db:migrate`.
 
 The API rejects production configuration unless both public origins use HTTPS and neither points to localhost. Apply database migrations before serving traffic. For the included Compose setup, set `PROD_DATABASE_URL` to the database service URL and use the development/database settings from `.env.example`; provision the separate Compose database before starting the stack.
 

@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { dash } from "@better-auth/infra";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { env } from "../env";
@@ -15,6 +16,10 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  plugins: [
+    // ... other plugins
+    dash()
+  ],
   emailAndPassword: {
     enabled: true,
      autoSignIn: false,

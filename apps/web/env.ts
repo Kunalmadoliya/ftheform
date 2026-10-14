@@ -10,7 +10,7 @@ const envSchema = z.object({
 });
 
 const safeParseResult = envSchema.safeParse({
-  NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL,
+  NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL ?? process.env.WEB_URL,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 });
 
