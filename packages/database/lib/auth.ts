@@ -18,43 +18,47 @@ export const auth = betterAuth({
   }),
   plugins: [
     // ... other plugins
-    dash()
+    dash(),
   ],
   emailAndPassword: {
     enabled: true,
-     autoSignIn: false,
+    autoSignIn: false,
     requireEmailVerification: true,
   },
   emailVerification: {
-     sendOnSignUp: true,
-     sendVerificationEmail: async ({ user, url }) => {
-       if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-         throw new Error("RESEND_API_KEY and EMAIL_FROM are required to send verification emails");
-       }
-       const escapedUrl = url.replace(/[&<>"']/g, (character) => ({
-         "&": "&amp;",
-         "<": "&lt;",
-         ">": "&gt;",
-         '"': "&quot;",
-         "'": "&#39;",
-       })[character]!);
-       const response = await fetch("https://api.resend.com/emails", {
-         method: "POST",
-         headers: {
-           Authorization: `Bearer ${env.RESEND_API_KEY}`,
-           "Content-Type": "application/json",
-         },
-         body: JSON.stringify({
-           from: env.EMAIL_FROM,
-           to: [user.email],
-           subject: "Verify your FTHEFORM email",
-           html: `<p>Confirm your email address to finish creating your FTHEFORM account.</p><p><a href="${escapedUrl}">Verify email</a></p>`,
-         }),
-       });
-       if (!response.ok) {
-         throw new Error(`Resend rejected the verification email request (${response.status})`);
-       }
-     },
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
+        throw new Error("RESEND_API_KEY and EMAIL_FROM are required to send verification emails");
+      }
+      const escapedUrl = url.replace(
+        /[&<>"']/g,
+        (character) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[character]!,
+      );
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: env.EMAIL_FROM,
+          to: [user.email],
+          subject: "Verify your FTHEFORM email",
+          html: `<p>Confirm your email address to finish creating your FTHEFORM account.</p><p><a href="${escapedUrl}">Verify email</a></p>`,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Resend rejected the verification email request (${response.status})`);
+      }
+    },
   },
   user: {
     additionalFields: {
