@@ -11,6 +11,7 @@ import { FormCanvas, type BuilderField } from "~/components/builder/form-canvas"
 import { FormSettingsBar } from "~/components/builder/form-settings-bar";
 import { FormPreviewDialog } from "~/components/builder/form-preview-dialog";
 import { ShareFormDialog } from "~/components/builder/share-form-dialog";
+import { AiFormGenerator } from "~/components/builder/ai-form-generator";
 import { useForm, useFormById } from "~/hooks/form/use-form";
 import { useFormFields } from "~/hooks/form/use-form-fields";
 import { authClient } from "~/lib/auth-client";
@@ -225,6 +226,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
         <FieldTypePalette onAdd={(definition) => void addField(definition)} />
         <FormCanvas fields={[...(fields as BuilderField[])].sort((a, b) => a.fieldOrder - b.fieldOrder)} selectedFieldId={selectedFieldId} title={title} description={description} onTitleChange={setTitle} onTitleSave={() => void saveTitle()} onDescriptionChange={setDescription} onDescriptionSave={() => void saveDescription()} onSelect={(field) => setSelectedFieldId(field.id)} onEdit={(field) => setSelectedFieldId(field.id)} onDelete={(field) => void deleteFieldFromCanvas(field)} onMove={(field, direction) => void moveField(field, direction)} onReorder={(orderedFieldIds) => void reorderFields(orderedFieldIds)} onAdd={() => void addField(fieldTypes[0]!)} />
         <aside className="border-t bg-background lg:w-80 lg:shrink-0 lg:border-l lg:border-t-0">
+          <AiFormGenerator formId={formId} />
           <FormSettingsBar
             isPublished={form.isPublished || Boolean(publishedUrl)}
             isOpen={isOpen}

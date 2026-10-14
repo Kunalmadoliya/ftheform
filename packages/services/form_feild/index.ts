@@ -12,6 +12,7 @@ import {
   type DeleteFormFieldType,
 } from "./model";
 import { form, formField } from "@repo/database/models/form-schema";
+import type { GeneratedFormField } from "../form_ai/model";
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -59,9 +60,48 @@ export default class FormFieldService {
       if (!newField) {
         throw new Error("Form field creation failed");
       }
-
       return newField;
     });
+  }
+
+  public async createGeneratedFieldsInTransaction(
+    tx: Pick<typeof db, "select" | "insert">,
+    formId: string,
+    userId: string,
+    fields: GeneratedFormField[],
+  ) {
+    const [ownedForm] = await tx
+      .select({ id: form.id })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+    if (!ownedForm) throw new Error("Form not found");
+
+    const [orderResult] = await tx
+      .select({ maxOrder: sql<number>`max(${formField.fieldOrder})` })
+      .from(formField)
+      .where(eq(formField.formId, formId));
+    if (!orderResult) throw new Error("Unable to determine the next form field order");
+
+    const startingOrder = (orderResult.maxOrder ?? -1) + 1;
+    const createdFields = await tx
+      .insert(formField)
+      .values(
+        fields.map((field, index) => ({
+          formId,
+          type: field.type,
+          category: field.category,
+          label: field.label,
+          required: field.required,
+          config: field.config ?? null,
+          fieldOrder: startingOrder + index,
+        })),
+      )
+      .returning();
+
+    if (createdFields.length !== fields.length) {
+      throw new Error("Generated form fields were not all persisted");
+    }
+    return createdFields;
   }
 
   public async updateFormField(input: UpdateFormType) {

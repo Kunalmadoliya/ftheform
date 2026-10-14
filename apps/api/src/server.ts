@@ -9,6 +9,9 @@ import { generateOpenApiDocument, createOpenApiExpressMiddleware } from "trpc-to
 import { apiReference } from "@scalar/express-api-reference";
 
 import { serverRouter, createContext } from "@repo/trpc/server";
+import { serve as serveInngest } from "inngest/express";
+import { generateFormFieldsFunction } from "@repo/services/form_ai/functions";
+import { inngest } from "@repo/services/form_ai/inngest-client";
 
 import { env } from "./env";
 
@@ -32,6 +35,10 @@ app.all("/api/auth/{*splat}", toNodeHandler(auth));
 
 // JSON parser for every other route, after the auth handler
 app.use(express.json());
+app.use(
+  "/api/inngest",
+  serveInngest({ client: inngest, functions: [generateFormFieldsFunction] }),
+);
 
 app.get("/", (req, res) => {
   return res.json({ message: "Streamyst is up and running..." });

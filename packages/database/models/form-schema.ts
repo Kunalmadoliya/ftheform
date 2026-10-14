@@ -13,6 +13,12 @@ import { user } from "../auth-schema";
 import { relations } from "drizzle-orm";
 
 export const formStatus = pgEnum("status", ["filling", "submitted", "not_submitted"]);
+export const formGenerationJobStatus = pgEnum("form_generation_job_status", [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+]);
 
 export const form = pgTable(
   "form",
@@ -74,6 +80,30 @@ export const formField = pgTable(
       .notNull(),
   },
   (table) => [index("form_field_idx").on(table.formId)],
+);
+
+export const formGenerationJob = pgTable(
+  "form_generation_job",
+  {
+    id: uuid("form_generation_job_id").primaryKey().defaultRandom(),
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => form.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    prompt: text("prompt").notNull(),
+    status: formGenerationJobStatus("status").notNull().default("pending"),
+    error: text("error"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("form_generation_job_form_idx").on(table.formId),
+    index("form_generation_job_user_idx").on(table.userId),
+  ],
 );
 
 export const submission = pgTable(

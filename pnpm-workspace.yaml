@@ -4,6 +4,7 @@ packages:
 allowBuilds:
   '@swc/core': true
   esbuild: true
+  protobufjs: set this to true or false
 minimumReleaseAgeExclude:
   - '@scalar/client-side-rendering@0.4.1'
   - '@scalar/express-api-reference@0.10.19'

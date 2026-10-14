@@ -23,7 +23,7 @@ FTHEFORM is a pnpm/Turborepo monorepo for authenticated form creation and manage
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 22 or newer
 - pnpm 12
 - Docker Desktop or another Docker runtime for PostgreSQL
 
@@ -43,6 +43,28 @@ pnpm --filter web dev
 ```
 
 The web app runs on `http://localhost:3000`. The API runs on `http://localhost:4000` by default.
+
+### AI form generation
+
+AI generation runs in the API process through Inngest and uses the existing OpenAI SDK on the server only. Configure `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4.1-mini`) in the root `.env`; never add these values to `NEXT_PUBLIC_*` variables. The Inngest SDK uses `INNGEST_DEV=http://localhost:8288` to send local events to its development server. Local development does not require Inngest Cloud event or signing keys.
+
+Apply the generation-job table migration before using the feature:
+
+```bash
+pnpm db:migrate
+```
+
+Start these processes in separate terminals:
+
+```bash
+pnpm --filter @repo/api dev
+npx inngest-cli@latest dev -u http://localhost:4000/api/inngest
+pnpm --filter web dev
+```
+
+In production, configure `OPENAI_API_KEY` and `OPENAI_MODEL` for the API. For Inngest Cloud, also configure `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`; register the API endpoint at `https://<public-api-host>/api/inngest`. Do not set `INNGEST_DEV` in production. The included Compose setup passes these values only to the API service. Missing AI credentials do not prevent unrelated API routes from starting, but generation will fail with an actionable status until the relevant service is configured.
+
+From a form builder, enter a description of the fields to generate in the right sidebar and choose **Generate fields**. Generated fields are validated against supported form field definitions and appended after the existing fields in a single transaction. They appear in the builder when the background job completes. If the form is already published, use **Republish** to create a new live snapshot; existing submissions remain tied to their original snapshot.
 
 Useful root commands are `pnpm dev`, `pnpm build`, `pnpm check-types`, `pnpm lint`, `pnpm format`, `pnpm db:generate`, and `pnpm db:migrate`.
 
