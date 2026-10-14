@@ -1,6 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { auth } from "@repo/database/lib/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getDomain } from "tldts";
 
 type SessionResponse = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
 
@@ -10,11 +11,21 @@ const respondentIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function respondentSignature(id: string, issuedAt: number) {
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) throw new Error("BETTER_AUTH_SECRET is required to sign respondent cookies");
+  const secret = process.env.RESPONDENT_COOKIE_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("RESPONDENT_COOKIE_SECRET must contain at least 32 characters");
+  }
   return createHmac("sha256", secret)
     .update(`ftheform:respondent:v1:${id}:${issuedAt}`)
     .digest("base64url");
+}
+
+function areSitesDifferent(webUrl: string, apiUrl: string) {
+  const web = new URL(webUrl);
+  const api = new URL(apiUrl);
+  const webSite = getDomain(web.hostname) ?? web.hostname;
+  const apiSite = getDomain(api.hostname) ?? api.hostname;
+  return web.protocol !== api.protocol || webSite !== apiSite;
 }
 
 function readRespondentId(cookieHeader: string | undefined): string | null {
@@ -86,9 +97,16 @@ export async function createContext({
       req.secure ||
       firstForwardedProto === "https" ||
       process.env.BASE_URL?.startsWith("https://");
+    const crossSite =
+      process.env.NODE_ENV === "production" &&
+      areSitesDifferent(
+        process.env.WEB_URL ?? "http://localhost:3000",
+        process.env.BASE_URL ?? "http://localhost:4000",
+      );
     const secure =
-      process.env.NODE_ENV === "production" && requestUsesHttps ? "; Secure" : "";
-    const cookie = `${respondentCookieName}=${value}; Max-Age=${respondentCookieMaxAge}; Path=/; HttpOnly; SameSite=Lax${secure}`;
+      process.env.NODE_ENV === "production" && (crossSite || requestUsesHttps) ? "; Secure" : "";
+    const sameSite = crossSite ? "None" : "Lax";
+    const cookie = `${respondentCookieName}=${value}; Max-Age=${respondentCookieMaxAge}; Path=/; HttpOnly; SameSite=${sameSite}${secure}`;
     const existing = res.getHeader("Set-Cookie");
     res.setHeader("Set-Cookie", existing
       ? [...(Array.isArray(existing) ? existing : [String(existing)]), cookie]

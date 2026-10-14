@@ -1,5 +1,5 @@
 import { answer, form, formField, formSnapshot, submission } from "@repo/database/schema";
-import { and, count, db, desc, eq, isNull, sql } from "@repo/database";
+import { and, count, db, desc, eq, isNull, or, sql } from "@repo/database";
 import { randomUUID } from "node:crypto";
 import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
@@ -32,6 +32,12 @@ import {
 
 export default class SubmissionService {
   private respondentCondition(userId: string | null | undefined, respondentId: string | null | undefined) {
+    if (userId && respondentId) {
+      return or(
+        eq(submission.userId, userId),
+        and(isNull(submission.userId), eq(submission.respondentId, respondentId)),
+      );
+    }
     if (userId) return eq(submission.userId, userId);
     if (respondentId) {
       return and(isNull(submission.userId), eq(submission.respondentId, respondentId));
@@ -71,6 +77,21 @@ export default class SubmissionService {
       .returning();
     if (!migratedSubmission) throw new Error("Unable to migrate the active response");
     return migratedSubmission;
+  }
+
+  private async ensureSubmissionRespondentId(
+    tx: Pick<typeof db, "update">,
+    currentSubmission: typeof submission.$inferSelect,
+    respondentId: string,
+  ) {
+    if (currentSubmission.respondentId) return currentSubmission;
+    const [updatedSubmission] = await tx
+      .update(submission)
+      .set({ respondentId })
+      .where(and(eq(submission.id, currentSubmission.id), eq(submission.status, "filling")))
+      .returning();
+    if (!updatedSubmission) throw new Error("Unable to set the response identity");
+    return updatedSubmission;
   }
 
   private async validateFormVersion(input: validateSubmittedFormVersionType) {
@@ -121,10 +142,7 @@ export default class SubmissionService {
       await startSubmissionFormSchema.parseAsync(input);
     const { form: formSettings } = await this.validateFormVersion({ formId, userId });
 
-    const respondentId =
-      !userId && formSettings.accessPolicy !== "authenticated_only"
-        ? cookieRespondentId ?? randomUUID()
-        : cookieRespondentId ?? null;
+    const respondentId = cookieRespondentId ?? randomUUID();
     const identityKeys = userId
       ? [
           `submission:${formId}:user:${userId}`,
@@ -163,36 +181,32 @@ export default class SubmissionService {
         .limit(1);
       if (!snapshot) throw new Error("Form snapshot not found");
 
-      const identities = userId
-        ? [
-            { userId, respondentId: null },
-            ...(respondentId ? [{ userId: null, respondentId }] : []),
-          ]
-        : [{ userId: null, respondentId }];
+      const identityFilters = [
+        ...(userId ? [eq(submission.userId, userId)] : []),
+        eq(submission.respondentId, respondentId),
+      ];
 
       if (!currentForm.allowMultipleSubmissions) {
-        for (const identity of identities) {
-          const [previouslySubmitted] = await tx
-            .select({ submittedAt: submission.submittedAt })
-            .from(submission)
-            .where(
-              and(
-                eq(submission.formId, formId),
-                eq(submission.status, "submitted"),
-                identity.userId
-                  ? eq(submission.userId, identity.userId)
-                  : and(isNull(submission.userId), eq(submission.respondentId, identity.respondentId!)),
-              ),
-            )
-            .orderBy(desc(submission.submittedAt))
-            .limit(1);
-          if (previouslySubmitted) {
-            return {
-              outcome: "already_submitted" as const,
-              formId,
-              submittedAt: previouslySubmitted.submittedAt,
-            };
-          }
+        const [previouslySubmitted] = await tx
+          .select({
+            submittedAt: submission.submittedAt,
+            respondentId: submission.respondentId,
+          })
+          .from(submission)
+          .where(and(
+            eq(submission.formId, formId),
+            eq(submission.status, "submitted"),
+            or(...identityFilters),
+          ))
+          .orderBy(desc(submission.submittedAt))
+          .limit(1);
+        if (previouslySubmitted) {
+          return {
+            outcome: "already_submitted" as const,
+            formId,
+            submittedAt: previouslySubmitted.submittedAt,
+            respondentId: previouslySubmitted.respondentId,
+          };
         }
       }
 
@@ -207,7 +221,12 @@ export default class SubmissionService {
         .limit(1);
       if (activeSubmission) {
         const migratedSubmission = await this.migrateSubmissionToSnapshot(tx, activeSubmission, snapshot);
-        return { outcome: "started" as const, submission: migratedSubmission };
+        const identifiedSubmission = await this.ensureSubmissionRespondentId(
+          tx,
+          migratedSubmission,
+          respondentId,
+        );
+        return { outcome: "started" as const, submission: identifiedSubmission };
       }
 
       if (userId && respondentId && currentForm.accessPolicy !== "anonymous_only") {
@@ -228,7 +247,7 @@ export default class SubmissionService {
           const migratedDraft = await this.migrateSubmissionToSnapshot(tx, anonymousDraft, snapshot);
           const [adoptedDraft] = await tx
             .update(submission)
-            .set({ userId, respondentId: null, lastActivity: new Date() })
+            .set({ userId, respondentId, lastActivity: new Date() })
             .where(and(eq(submission.id, migratedDraft.id), eq(submission.status, "filling")))
             .returning();
           if (!adoptedDraft) throw new Error("Unable to resume the anonymous response");
@@ -251,7 +270,7 @@ export default class SubmissionService {
           formId,
           snapshotId: snapshot.id,
           userId: userId ?? null,
-          respondentId: userId ? null : respondentId,
+          respondentId,
           status: "filling",
           submittedAt: null,
         })
@@ -262,7 +281,11 @@ export default class SubmissionService {
 
     return {
       ...result,
-      respondentIdToSet: !userId && !cookieRespondentId ? respondentId : null,
+      respondentIdToSet: cookieRespondentId
+        ? null
+        : result.outcome === "started"
+          ? result.submission.respondentId
+          : result.respondentId,
     };
   }
 
@@ -451,26 +474,20 @@ export default class SubmissionService {
       );
 
       if (!formSettings.allowMultipleSubmissions) {
-        const identityFilters = userId
-          ? [
-              eq(submission.userId, userId),
-              ...(respondentId
-                ? [and(isNull(submission.userId), eq(submission.respondentId, respondentId))]
-                : []),
-            ]
-          : [and(isNull(submission.userId), eq(submission.respondentId, respondentId!))];
-        for (const identityFilter of identityFilters) {
-          const [priorSubmission] = await tx
-            .select()
-            .from(submission)
-            .where(and(
-              eq(submission.formId, existing.formId),
-              eq(submission.status, "submitted"),
-              identityFilter,
-            ))
-            .limit(1);
-          if (priorSubmission) return priorSubmission;
-        }
+        const identityFilters = [
+          ...(userId ? [eq(submission.userId, userId)] : []),
+          ...(respondentId ? [eq(submission.respondentId, respondentId)] : []),
+        ];
+        const [priorSubmission] = await tx
+          .select()
+          .from(submission)
+          .where(and(
+            eq(submission.formId, existing.formId),
+            eq(submission.status, "submitted"),
+            or(...identityFilters),
+          ))
+          .limit(1);
+        if (priorSubmission) return priorSubmission;
       }
 
       const [submittedResult] = await tx

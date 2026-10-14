@@ -5,6 +5,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]),
   BASE_URL: z.string().default("http://localhost:4000"),
   WEB_URL: z.string().default("http://localhost:3000"),
+  RESPONDENT_COOKIE_SECRET: z.string().min(32),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {
