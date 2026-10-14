@@ -49,7 +49,7 @@ const fieldProperties = {
   required: z.boolean(),
 };
 
-export const generatedFieldSchema = z.discriminatedUnion("type", [
+export const generatedFieldConfigSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...fieldProperties, type: z.literal("text"), config: placeholderConfig }),
   z.strictObject({ ...fieldProperties, type: z.literal("textarea"), config: placeholderConfig }),
   z.strictObject({ ...fieldProperties, type: z.literal("email"), config: placeholderConfig }),
@@ -68,6 +68,8 @@ export const generatedFieldSchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({ ...fieldProperties, type: z.literal("date"), config: dateConfig }),
 ]);
+
+export const generatedFieldSchema = generatedFieldConfigSchema;
 
 export const generatedFieldsSchema = z.array(generatedFieldSchema).min(1).max(20);
 

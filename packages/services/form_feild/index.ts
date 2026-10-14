@@ -12,7 +12,7 @@ import {
   type DeleteFormFieldType,
 } from "./model";
 import { form, formField } from "@repo/database/models/form-schema";
-import type { GeneratedFormField } from "../form_ai/model";
+import { generatedFieldConfigSchema, type GeneratedFormField } from "../form_ai/model";
 
 export default class FormFieldService {
   private async validateFormOwnership(formId: string, userId: string) {
@@ -111,9 +111,32 @@ export default class FormFieldService {
     await this.validateFormOwnership(formId, userId);
 
     return db.transaction(async (tx) => {
+      const [currentField] = await tx
+        .select()
+        .from(formField)
+        .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))
+        .for("update");
+      if (!currentField) {
+        throw new Error("Form field not found");
+      }
+      const nextConfig = config === undefined ? currentField.config ?? undefined : config;
+      const validatedField = generatedFieldConfigSchema.parse({
+        type: type ?? currentField.type,
+        category: category ?? currentField.category,
+        label: label ?? currentField.label,
+        required: required ?? currentField.required,
+        ...(nextConfig === undefined ? {} : { config: nextConfig }),
+      });
       const [updatedFormField] = await tx
         .update(formField)
-        .set({ type, category, label, required, config, fieldOrder })
+        .set({
+          type: validatedField.type,
+          category: validatedField.category,
+          label: validatedField.label,
+          required: validatedField.required,
+          config: validatedField.config ?? null,
+          fieldOrder: fieldOrder ?? currentField.fieldOrder,
+        })
         .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))
         .returning();
 

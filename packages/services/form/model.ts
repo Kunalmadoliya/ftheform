@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const createInitialForm = z.object({
-  title: z.string().describe("form title"),
-  description: z.string().optional().describe("form description"),
+  title: z.string().trim().min(1).max(200).describe("form title"),
+  description: z.string().max(2000).optional().describe("form description"),
   userId: z.string().describe("user id"),
 });
 
@@ -23,7 +23,7 @@ export type GetPublicFormByIdType = z.infer<typeof getPublicFormById>;
 
 export const renameForm = z.object({
   formId: z.string().describe("form id"),
-  title: z.string().min(1).describe("new form title"),
+  title: z.string().trim().min(1).max(200).describe("new form title"),
   userId: z.string().describe("user id"),
 });
 
@@ -31,7 +31,7 @@ export type RenameFormType = z.infer<typeof renameForm>;
 
 export const updateFormDescription = z.object({
   formId: z.string().describe("form id"),
-  description: z.string().nullable().describe("new form description"),
+  description: z.string().max(2000).nullable().describe("new form description"),
   userId: z.string().describe("user id"),
 });
 
