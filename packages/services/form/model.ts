@@ -1,4 +1,26 @@
 import { z } from "zod";
+import { serviceError } from "../errors";
+
+export const formLifecycleSchema = z.enum(["live", "draft", "archived"]);
+export type FormLifecycle = z.infer<typeof formLifecycleSchema>;
+
+export function deriveFormLifecycle(isPublished: boolean, isArchived: boolean): FormLifecycle {
+  if (isArchived) return "archived";
+  return isPublished ? "live" : "draft";
+}
+
+export function requireDeleteConfirmation(
+  submittedCount: number,
+  confirmDeleteResponses: boolean | undefined,
+  expectedSubmittedCount: number | undefined,
+) {
+  if (
+    submittedCount > 0 &&
+    (confirmDeleteResponses !== true || expectedSubmittedCount !== submittedCount)
+  ) {
+    throw serviceError("CONFLICT", "Submitted responses changed or require explicit confirmation.");
+  }
+}
 
 export const createInitialForm = z.object({
   title: z.string().trim().min(1).max(200).describe("form title"),
@@ -53,9 +75,30 @@ export type UpdateFormSettingsType = z.infer<typeof updateFormSettings>;
 export const deleteForm = z.object({
   formId: z.string().describe("form id"),
   userId: z.string().describe("user id"),
+  confirmDeleteResponses: z.boolean().optional(),
+  expectedSubmittedCount: z.number().int().min(0).optional(),
 });
 
 export type DeleteFormType = z.infer<typeof deleteForm>;
+
+export const archiveForm = z.object({
+  formId: z.string().uuid(),
+  userId: z.string(),
+});
+
+export const restoreForm = archiveForm;
+
+export const getFormDeletionPreview = z.object({
+  formId: z.string().uuid(),
+  userId: z.string(),
+});
+
+export const listFormsByLifecycle = z.object({
+  userId: z.string(),
+  lifecycle: formLifecycleSchema,
+});
+
+export type ListFormsByLifecycleType = z.infer<typeof listFormsByLifecycle>;
 
 export const listFormsByUser = z.object({
   userId: z.string().describe("user id"),

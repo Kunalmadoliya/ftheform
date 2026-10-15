@@ -15,6 +15,7 @@ import {
 import { assertFormAccess } from "../form/access";
 import { validateSnapshotDraft } from "../form_submission/draft-validation";
 import { serviceError } from "../errors";
+import { deriveFormLifecycle } from "../form/model";
 
 export default class AnswerService {
   public async saveAnswer(input: SaveAnswerInputType) {
@@ -44,25 +45,41 @@ export default class AnswerService {
         : undefined;
     if (!identityCondition) throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
 
+    const [submissionReference] = await db
+      .select({ formId: submission.formId })
+      .from(submission)
+      .where(and(eq(submission.id, submissionId), identityCondition))
+      .limit(1);
+    if (!submissionReference) throw serviceError("NOT_FOUND", "Form no longer available");
+
     return db.transaction(async (tx) => {
-      const [submissionResult] = await tx
+      const [formAccess] = await tx
         .select({
-          submissionRecord: submission,
           accessPolicy: form.accessPolicy,
+          isPublished: form.isPublished,
           isArchived: form.isArchived,
           ownerId: form.userId,
         })
+        .from(form)
+        .where(eq(form.id, submissionReference.formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      if (!formAccess.ownerId || deriveFormLifecycle(formAccess.isPublished, formAccess.isArchived) === "archived") {
+        throw serviceError("NOT_FOUND", "Form no longer available");
+      }
+      assertFormAccess(formAccess.accessPolicy, userId);
+
+      const [submissionRecord] = await tx
+        .select()
         .from(submission)
-        .innerJoin(form, eq(submission.formId, form.id))
-        .where(and(eq(submission.id, submissionId), identityCondition))
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.formId, submissionReference.formId),
+          identityCondition,
+        ))
         .limit(1)
         .for("update");
-      if (!submissionResult) throw serviceError("NOT_FOUND", "Submission not found");
-      const { submissionRecord } = submissionResult;
-      if (submissionResult.isArchived || !submissionResult.ownerId) {
-        throw serviceError("FORBIDDEN", "Form is archived");
-      }
-      assertFormAccess(submissionResult.accessPolicy, userId);
+      if (!submissionRecord) throw serviceError("NOT_FOUND", "Form no longer available");
       if (submissionRecord.status !== "filling") {
         throw serviceError("CONFLICT", "Submission is already finalized");
       }

@@ -14,6 +14,7 @@ import {
 import { form, formField } from "@repo/database/models/form-schema";
 import { generatedFieldConfigSchema, type GeneratedFormField } from "../form_ai/model";
 import { serviceError } from "../errors";
+import { deriveFormLifecycle } from "../form/model";
 
 export const MAX_FORM_FIELDS = 100;
 
@@ -22,10 +23,26 @@ export default class FormFieldService {
     const [owns] = await db
       .select({ id: form.id })
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
 
     if (!owns) {
       throw serviceError("NOT_FOUND", "Form not found");
+    }
+  }
+
+  private async lockOwnedWritableForm(
+    tx: Pick<typeof db, "select">,
+    formId: string,
+    userId: string,
+  ) {
+    const [ownedForm] = await tx
+      .select({ id: form.id, isPublished: form.isPublished, isArchived: form.isArchived })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .for("update");
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+    if (deriveFormLifecycle(ownedForm.isPublished, ownedForm.isArchived) === "archived") {
+      throw serviceError("CONFLICT", "Archived forms cannot be changed");
     }
   }
 
@@ -45,9 +62,8 @@ export default class FormFieldService {
     const { formId, type, category, label, required, config, userId } =
       await createFormField.parseAsync(input);
 
-    await this.validateFormOwnership(formId, userId);
-
     return db.transaction(async (tx) => {
+      await this.lockOwnedWritableForm(tx, formId, userId);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"form-fields:" + formId}, 0))`);
       const [fieldCount] = await tx
         .select({ count: count() })
@@ -82,12 +98,16 @@ export default class FormFieldService {
     userId: string,
     fields: GeneratedFormField[],
   ) {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"form-fields:" + formId}, 0))`);
     const [ownedForm] = await tx
-      .select({ id: form.id })
+      .select({ id: form.id, isPublished: form.isPublished, isArchived: form.isArchived })
       .from(form)
-      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
+      .where(and(eq(form.id, formId), eq(form.userId, userId)))
+      .for("update");
     if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+    if (deriveFormLifecycle(ownedForm.isPublished, ownedForm.isArchived) === "archived") {
+      throw serviceError("CONFLICT", "Archived forms cannot be changed");
+    }
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"form-fields:" + formId}, 0))`);
 
     const [orderResult] = await tx
       .select({ maxOrder: sql<number>`max(${formField.fieldOrder})` })
@@ -130,9 +150,8 @@ export default class FormFieldService {
     const { formFieldId, formId, type, category, label, required, config, userId, fieldOrder } =
       await updateForm.parseAsync(input);
 
-    await this.validateFormOwnership(formId, userId);
-
     return db.transaction(async (tx) => {
+      await this.lockOwnedWritableForm(tx, formId, userId);
       const [currentField] = await tx
         .select()
         .from(formField)
@@ -172,9 +191,8 @@ export default class FormFieldService {
 
   public async reorderFields(input: ReorderFieldsType) {
     const { formId, orderedFieldIds, userId } = await reorderFieldsSchema.parseAsync(input);
-    await this.validateFormOwnership(formId, userId);
-
     return db.transaction(async (tx) => {
+      await this.lockOwnedWritableForm(tx, formId, userId);
       const existing = await tx
         .select({ id: formField.id })
         .from(formField)
@@ -211,9 +229,8 @@ export default class FormFieldService {
 
   public async deleteFormField(input: DeleteFormFieldType) {
     const { formId, formFieldId, userId } = await deleteFormFieldSchema.parseAsync(input);
-    await this.validateFormOwnership(formId, userId);
-
     return db.transaction(async (tx) => {
+      await this.lockOwnedWritableForm(tx, formId, userId);
       const [deletedField] = await tx
         .delete(formField)
         .where(and(eq(formField.id, formFieldId), eq(formField.formId, formId)))

@@ -1,15 +1,23 @@
-import { and, count, db, desc, eq, isNotNull, or, sql } from "@repo/database";
+import { and, count, db, desc, eq, inArray, isNotNull, or, sql } from "@repo/database";
+import { user } from "@repo/database/auth-schema";
 import {
   createInitialForm,
   deleteForm,
+  deriveFormLifecycle,
   type CreateInitialFormType,
   type DeleteFormType,
+  getFormDeletionPreview,
   getFormById,
   type GetFormByIdType,
   getPublicFormById,
   type GetPublicFormByIdType,
+  listFormsByLifecycle,
+  type ListFormsByLifecycleType,
   listFormsByUser,
   type ListFormsByUserType,
+  requireDeleteConfirmation,
+  archiveForm,
+  restoreForm,
   renameForm,
   type RenameFormType,
   updateFormDescription,
@@ -27,13 +35,14 @@ import {
   unpublishForm,
   type UnpublishFormType,
 } from "./model";
-import { form, formField, formSnapshot, formView, submission } from "@repo/database/models/form-schema";
+import { answer, form, formField, formSnapshot, formView, submission } from "@repo/database/models/form-schema";
 import { env } from "../env";
 import FormSnapshotService from "../form_snapshot";
 import { assertFormAccess } from "./access";
 import { fieldSetHash } from "./snapshot-utils";
 import { slugifyFormTitle } from "./slug-utils";
 import { serviceError } from "../errors";
+import { buildFormCsv } from "./csv";
 
 const formSnapshotService = new FormSnapshotService();
 
@@ -117,12 +126,14 @@ export default class FormService {
       .from(form)
       .where(and(
         eq(form.id, formId),
-        eq(form.isArchived, false),
         isNotNull(form.userId),
         or(eq(form.isPublished, true), userId ? eq(form.userId, userId) : undefined),
       ));
 
-    if (!foundForm) throw serviceError("NOT_FOUND", "Form not found");
+    if (!foundForm) throw serviceError("NOT_FOUND", "Form no longer available");
+    if (deriveFormLifecycle(foundForm.isPublished, foundForm.isArchived) === "archived") {
+      throw serviceError("NOT_FOUND", "Form no longer available");
+    }
     const isOwner = Boolean(userId && foundForm.ownerId === userId);
     if (!isOwner) assertFormAccess(foundForm.accessPolicy, userId);
     let submittedResponseCount = 0;
@@ -194,19 +205,40 @@ export default class FormService {
   }
 
   public async deleteForm(input: DeleteFormType) {
-    const { formId, userId } = await deleteForm.parseAsync(input);
+    const { formId, userId, confirmDeleteResponses, expectedSubmittedCount } =
+      await deleteForm.parseAsync(input);
 
-    const [deletedForm] = await db
-      .update(form)
-      .set({ isArchived: true, isPublished: false, isOpen: false })
-      .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)))
-      .returning({ id: form.id });
+    return db.transaction(async (tx) => {
+      const [ownedForm] = await tx
+        .select({ id: form.id })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .for("update");
+      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
-    if (!deletedForm) {
-      throw serviceError("NOT_FOUND", "Form not found");
-    }
+      const [counts] = await tx
+        .select({ submittedCount: count() })
+        .from(submission)
+        .where(and(
+          eq(submission.formId, formId),
+          eq(submission.status, "submitted"),
+        ));
+      if (!counts) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to count form responses");
+      requireDeleteConfirmation(
+        counts.submittedCount,
+        confirmDeleteResponses,
+        expectedSubmittedCount,
+      );
 
-    return deletedForm;
+      await tx.delete(submission).where(eq(submission.formId, formId));
+      await tx.delete(formSnapshot).where(eq(formSnapshot.formId, formId));
+      const [deletedForm] = await tx
+        .delete(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .returning({ id: form.id });
+      if (!deletedForm) throw serviceError("NOT_FOUND", "Form not found");
+      return deletedForm;
+    });
   }
 
   public async listFormsByUser(input: ListFormsByUserType) {
@@ -217,6 +249,156 @@ export default class FormService {
       .from(form)
       .where(eq(form.userId, userId))
       .orderBy(desc(form.createdAt));
+  }
+
+  public async archiveForm(input: { formId: string; userId: string }) {
+    const { formId, userId } = await archiveForm.parseAsync(input);
+    return db.transaction(async (tx) => {
+      const [ownedForm] = await tx
+        .select({ id: form.id, isArchived: form.isArchived })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .for("update");
+      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+      if (deriveFormLifecycle(false, ownedForm.isArchived) === "archived") {
+        throw serviceError("CONFLICT", "Form is already archived");
+      }
+
+      const [archivedForm] = await tx
+        .update(form)
+        .set({ isArchived: true })
+        .where(eq(form.id, formId))
+        .returning(this.formSelection());
+      if (!archivedForm) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to archive form");
+      return { ...archivedForm, lifecycle: deriveFormLifecycle(archivedForm.isPublished, true) };
+    });
+  }
+
+  public async restoreForm(input: { formId: string; userId: string }) {
+    const { formId, userId } = await restoreForm.parseAsync(input);
+    return db.transaction(async (tx) => {
+      const [ownedForm] = await tx
+        .select({ id: form.id, isArchived: form.isArchived })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .for("update");
+      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+      if (deriveFormLifecycle(false, ownedForm.isArchived) !== "archived") {
+        throw serviceError("CONFLICT", "Form is not archived");
+      }
+
+      const [restoredForm] = await tx
+        .update(form)
+        .set({ isArchived: false })
+        .where(eq(form.id, formId))
+        .returning(this.formSelection());
+      if (!restoredForm) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to restore form");
+      return { ...restoredForm, lifecycle: deriveFormLifecycle(restoredForm.isPublished, false) };
+    });
+  }
+
+  public async getFormDeletionPreview(input: { formId: string; userId: string }) {
+    const { formId, userId } = await getFormDeletionPreview.parseAsync(input);
+    const [ownedForm] = await db
+      .select({ isPublished: form.isPublished, isArchived: form.isArchived })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+
+    const counts = await db
+      .select({ status: submission.status, count: count() })
+      .from(submission)
+      .where(eq(submission.formId, formId))
+      .groupBy(submission.status);
+    return {
+      submittedCount: counts.find(({ status }) => status === "submitted")?.count ?? 0,
+      inProgressCount: counts.find(({ status }) => status === "filling")?.count ?? 0,
+      isPublished: ownedForm.isPublished,
+      isArchived: ownedForm.isArchived,
+    };
+  }
+
+  public async listFormsByLifecycle(input: ListFormsByLifecycleType) {
+    const { userId, lifecycle } = await listFormsByLifecycle.parseAsync(input);
+    const ownedForms = await db
+      .select(this.formSelection())
+      .from(form)
+      .where(eq(form.userId, userId))
+      .orderBy(desc(form.createdAt));
+
+    const counts = { live: 0, draft: 0, archived: 0 };
+    const formsWithLifecycle = ownedForms.map((ownedForm) => {
+      const formLifecycle = deriveFormLifecycle(ownedForm.isPublished, ownedForm.isArchived);
+      counts[formLifecycle] += 1;
+      return { ...ownedForm, lifecycle: formLifecycle };
+    });
+    const selectedForms = formsWithLifecycle.filter(({ lifecycle: formLifecycle }) => formLifecycle === lifecycle);
+    const submittedCounts = selectedForms.length === 0
+      ? []
+      : await db
+          .select({ formId: submission.formId, count: count() })
+          .from(submission)
+          .where(and(
+            inArray(submission.formId, selectedForms.map(({ id }) => id)),
+            eq(submission.status, "submitted"),
+          ))
+          .groupBy(submission.formId);
+    const submittedByFormId = new Map(
+      submittedCounts.map(({ formId, count: submittedCount }) => [formId, submittedCount]),
+    );
+
+    return {
+      forms: selectedForms.map((ownedForm) => ({
+        ...ownedForm,
+        submittedCount: submittedByFormId.get(ownedForm.id) ?? 0,
+      })),
+      counts,
+    };
+  }
+
+  public async exportFormCsv(input: { formId: string; userId: string }) {
+    const { formId, userId } = await getFormDeletionPreview.parseAsync(input);
+    const [ownedForm] = await db
+      .select({ id: form.id })
+      .from(form)
+      .where(and(eq(form.id, formId), eq(form.userId, userId)));
+    if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+
+    const snapshots = await db
+      .select({
+        versions: formSnapshot.versions,
+        createdAt: formSnapshot.createdAt,
+        fieldsJson: formSnapshot.fieldsJson,
+      })
+      .from(formSnapshot)
+      .where(eq(formSnapshot.formId, formId));
+    const submitted = await db
+      .select({
+        id: submission.id,
+        submittedAt: submission.submittedAt,
+        versions: formSnapshot.versions,
+        respondentName: user.name,
+        respondentEmail: user.email,
+      })
+      .from(submission)
+      .innerJoin(formSnapshot, eq(submission.snapshotId, formSnapshot.id))
+      .leftJoin(user, eq(submission.userId, user.id))
+      .where(and(
+        eq(submission.formId, formId),
+        eq(submission.status, "submitted"),
+      ))
+      .orderBy(desc(submission.submittedAt));
+    const answers = submitted.length === 0
+      ? []
+      : await db
+          .select({
+            submissionId: answer.submissionId,
+            fieldKey: answer.fieldKey,
+            value: answer.value,
+          })
+          .from(answer)
+          .where(inArray(answer.submissionId, submitted.map(({ id }) => id)));
+    return buildFormCsv(snapshots, submitted, answers);
   }
 
   public async toggleFormOpen(input: ToggleFormOpenStatusType) {
@@ -266,16 +448,25 @@ export default class FormService {
     const { formId, respondentId } = await incrementFormViewCount.parseAsync(input);
     return db.transaction(async (tx) => {
       const [publicForm] = await tx
-        .select({ id: form.id, views: form.views })
+        .select({
+          id: form.id,
+          views: form.views,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
         .from(form)
         .where(and(
           eq(form.id, formId),
           eq(form.isPublished, true),
-          eq(form.isArchived, false),
           isNotNull(form.userId),
         ))
         .for("share");
-      if (!publicForm) throw serviceError("NOT_FOUND", "Form not found");
+      if (
+        !publicForm ||
+        deriveFormLifecycle(publicForm.isPublished, publicForm.isArchived) === "archived"
+      ) {
+        throw serviceError("NOT_FOUND", "Form no longer available");
+      }
 
       const [newView] = await tx
         .insert(formView)
@@ -284,10 +475,20 @@ export default class FormService {
         .returning({ id: formView.id });
       if (!newView) {
         const [currentForm] = await tx
-          .select({ id: form.id, views: form.views })
+          .select({
+            id: form.id,
+            views: form.views,
+            isPublished: form.isPublished,
+            isArchived: form.isArchived,
+          })
           .from(form)
           .where(eq(form.id, formId));
-        if (!currentForm) throw serviceError("NOT_FOUND", "Form not found");
+        if (
+          !currentForm ||
+          deriveFormLifecycle(currentForm.isPublished, currentForm.isArchived) === "archived"
+        ) {
+          throw serviceError("NOT_FOUND", "Form no longer available");
+        }
         return currentForm;
       }
 
@@ -317,7 +518,9 @@ export default class FormService {
       if (!currentForm) {
         throw serviceError("NOT_FOUND", "Form not found");
       }
-      if (currentForm.isArchived) throw serviceError("FORBIDDEN", "Archived forms cannot be published");
+      if (deriveFormLifecycle(false, currentForm.isArchived) === "archived") {
+        throw serviceError("CONFLICT", "Archived forms cannot be changed");
+      }
 
       const currentFields = await tx
         .select()
@@ -395,7 +598,9 @@ export default class FormService {
     if (!existingForm) {
       throw serviceError("NOT_FOUND", "Form not found");
     }
-    if (existingForm.isArchived) throw serviceError("FORBIDDEN", "Archived forms cannot be changed");
+    if (deriveFormLifecycle(existingForm.isPublished, existingForm.isArchived) === "archived") {
+      throw serviceError("CONFLICT", "Archived forms cannot be changed");
+    }
 
     if (!existingForm.isPublished) {
       throw serviceError("CONFLICT", "Form is already unpublished");

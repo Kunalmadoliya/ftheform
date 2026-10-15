@@ -3,7 +3,6 @@ import { protectedProcedure, publicProcedure } from "../../trpc";
 import {
   createInitialFormInput,
   createInitialFormOutput,
-  deleteFormInput,
   deleteFormOutput,
   getFormByIdInput,
   getFormByIdOutput,
@@ -11,6 +10,17 @@ import {
   incrementFormViewCountInput,
   incrementFormViewCountOutput,
   listFormsByUserOutput,
+  archiveFormInput,
+  archiveFormOutput,
+  restoreFormInput,
+  restoreFormOutput,
+  listFormsByLifecycleInput,
+  listFormsByLifecycleOutput,
+  formDeletionPreviewInput,
+  formDeletionPreviewOutput,
+  permanentlyDeleteFormInput,
+  exportFormCsvInput,
+  exportFormCsvOutput,
   publishFormInput,
   publishFormOutput,
   renameFormInput,
@@ -156,13 +166,88 @@ export const formRouter = {
         protect: true,
       },
     })
-    .input(deleteFormInput)
+    .input(permanentlyDeleteFormInput)
     .output(deleteFormOutput)
     .mutation(async ({ ctx, input }) =>
       formServiceInstance.deleteForm({
         ...input,
         userId: ctx.userId,
       }),
+    ),
+
+  archiveForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: formsPath("/:formId/archive"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(archiveFormInput)
+    .output(archiveFormOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.archiveForm({ ...input, userId: ctx.userId }),
+    ),
+
+  restoreForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: formsPath("/:formId/restore"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(restoreFormInput)
+    .output(restoreFormOutput)
+    .mutation(({ ctx, input }) =>
+      formServiceInstance.restoreForm({ ...input, userId: ctx.userId }),
+    ),
+
+  getDeletionPreview: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: formsPath("/:formId/deletion-preview"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(formDeletionPreviewInput)
+    .output(formDeletionPreviewOutput)
+    .query(({ ctx, input }) =>
+      formServiceInstance.getFormDeletionPreview({ ...input, userId: ctx.userId }),
+    ),
+
+  exportCsv: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: formsPath("/:formId/export.csv"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(exportFormCsvInput)
+    .output(exportFormCsvOutput)
+    .query(({ ctx, input }) =>
+      formServiceInstance.exportFormCsv({ ...input, userId: ctx.userId }),
+    ),
+
+  listFormsByLifecycle: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: formsPath("/lifecycle/forms"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(listFormsByLifecycleInput)
+    .output(listFormsByLifecycleOutput)
+    .query(({ ctx, input }) =>
+      formServiceInstance.listFormsByLifecycle({ ...input, userId: ctx.userId }),
     ),
 
   listFormsByUser: protectedProcedure

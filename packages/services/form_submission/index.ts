@@ -5,6 +5,7 @@ import { assertFormAccess } from "../form/access";
 import { migrateDraftAnswers } from "../form/snapshot-utils";
 import { validateSnapshotDraft } from "./draft-validation";
 import { serviceError } from "../errors";
+import { deriveFormLifecycle } from "../form/model";
 import { buildSubmissionAnswerRows } from "./answer-rows";
 import {
   validateSubmittedFormVersion,
@@ -44,6 +45,12 @@ export default class SubmissionService {
       return and(isNull(submission.userId), eq(submission.respondentId, respondentId));
     }
     throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
+  }
+
+  private assertPublicFormAvailable(isPublished: boolean, isArchived: boolean, ownerId: string | null) {
+    if (!ownerId || deriveFormLifecycle(isPublished, isArchived) === "archived") {
+      throw serviceError("NOT_FOUND", "Form no longer available");
+    }
   }
 
   private async lockSubmissionIdentities(
@@ -113,10 +120,8 @@ export default class SubmissionService {
       .where(eq(form.id, formId))
       .for("share");
 
-    if (!validatedForm) {
-      throw serviceError("NOT_FOUND", "Form not found");
-    }
-    if (validatedForm.isArchived || !validatedForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+    if (!validatedForm) throw serviceError("NOT_FOUND", "Form no longer available");
+    this.assertPublicFormAvailable(validatedForm.isPublished, validatedForm.isArchived, validatedForm.ownerId);
     if (!validatedForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
     if (!validatedForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
     assertFormAccess(validatedForm.accessPolicy, userId);
@@ -152,8 +157,6 @@ export default class SubmissionService {
       : [`submission:${formId}:respondent:${respondentId}`];
 
     const result = await db.transaction(async (tx) => {
-      await this.lockSubmissionIdentities(tx, identityKeys);
-
       const [currentForm] = await tx
         .select({
           currentVersion: form.currentVersion,
@@ -168,8 +171,9 @@ export default class SubmissionService {
         .from(form)
         .where(eq(form.id, formId))
         .for("share");
-      if (!currentForm) throw serviceError("NOT_FOUND", "Form not found");
-      if (currentForm.isArchived || !currentForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+      if (!currentForm) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(currentForm.isPublished, currentForm.isArchived, currentForm.ownerId);
+      await this.lockSubmissionIdentities(tx, identityKeys);
       if (!currentForm.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
       if (!currentForm.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
       assertFormAccess(currentForm.accessPolicy, userId);
@@ -297,69 +301,114 @@ export default class SubmissionService {
   public async getActiveSubmission(input: activeSubmissionSchemaType) {
     const { formId, submissionId, userId, respondentId } = await activeSubmissionSchema.parseAsync(input);
     if (submissionId) return this.getSubmissionById({ submissionId, formId, userId, respondentId });
-    const [formAccess] = await db
-      .select({ accessPolicy: form.accessPolicy })
-      .from(form)
-      .where(eq(form.id, formId));
-    if (!formAccess) throw serviceError("NOT_FOUND", "Form not found");
-    assertFormAccess(formAccess.accessPolicy, userId);
-    const [activeSubmission] = await db
-      .select()
-      .from(submission)
-      .where(and(
-        eq(submission.formId, formId),
-        eq(submission.status, "filling"),
-        this.respondentCondition(userId, respondentId),
-      ))
-      .orderBy(desc(submission.lastActivity));
+    return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+        .select({
+          accessPolicy: form.accessPolicy,
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
+        .from(form)
+        .where(eq(form.id, formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+      assertFormAccess(formAccess.accessPolicy, userId);
+      const [activeSubmission] = await tx
+        .select()
+        .from(submission)
+        .where(and(
+          eq(submission.formId, formId),
+          eq(submission.status, "filling"),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .orderBy(desc(submission.lastActivity));
 
-    if (!activeSubmission) {
-      throw serviceError("NOT_FOUND", "Active submission not found");
-    }
-
-    return activeSubmission;
+      if (!activeSubmission) throw serviceError("NOT_FOUND", "Active submission not found");
+      return activeSubmission;
+    });
   }
 
   public async getSubmissionById(input: submissionLookupSchemaType) {
     const { submissionId, formId, userId, respondentId } = await submissionLookupSchema.parseAsync(input);
-    const [submissionResult] = await db
-      .select({
-        submissionRecord: submission,
-        accessPolicy: form.accessPolicy,
-      })
+    const [submissionReference] = await db
+      .select({ formId: submission.formId })
       .from(submission)
-      .innerJoin(form, eq(submission.formId, form.id))
       .where(and(
-          eq(submission.id, submissionId),
-          formId ? eq(submission.formId, formId) : undefined,
-          this.respondentCondition(userId, respondentId),
-        ));
-    if (!submissionResult) {
-      throw serviceError("NOT_FOUND", "Submission not found");
-    }
-    assertFormAccess(submissionResult.accessPolicy, userId);
-    const submissionRecord = submissionResult.submissionRecord;
-    return submissionRecord;
+        eq(submission.id, submissionId),
+        formId ? eq(submission.formId, formId) : undefined,
+        this.respondentCondition(userId, respondentId),
+      ))
+      .limit(1);
+    if (!submissionReference) throw serviceError("NOT_FOUND", "Form no longer available");
+
+    return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+      .select({
+        accessPolicy: form.accessPolicy,
+        ownerId: form.userId,
+        isPublished: form.isPublished,
+        isArchived: form.isArchived,
+      })
+      .from(form)
+      .where(eq(form.id, submissionReference.formId))
+      .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+      assertFormAccess(formAccess.accessPolicy, userId);
+
+      const [submissionRecord] = await tx
+      .select()
+      .from(submission)
+      .where(and(
+        eq(submission.id, submissionId),
+        eq(submission.formId, submissionReference.formId),
+        this.respondentCondition(userId, respondentId),
+      ))
+      .limit(1);
+      if (!submissionRecord) throw serviceError("NOT_FOUND", "Form no longer available");
+      return submissionRecord;
+    });
   }
 
   public async updateDraftAnswer(input: updateDraftAnswerSchemaType) {
     const { submissionId, draftAnswer, userId, respondentId } = await updateDraftAnswerSchema.parseAsync(input);
+    const [submissionReference] = await db
+      .select({ formId: submission.formId })
+      .from(submission)
+      .where(and(eq(submission.id, submissionId), this.respondentCondition(userId, respondentId)))
+      .limit(1);
+    if (!submissionReference) throw serviceError("NOT_FOUND", "Form no longer available");
+
     return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+        .select({
+          accessPolicy: form.accessPolicy,
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
+        .from(form)
+        .where(eq(form.id, submissionReference.formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+      assertFormAccess(formAccess.accessPolicy, userId);
+
       const [existing] = await tx
         .select({
           submissionRecord: submission,
-          accessPolicy: form.accessPolicy,
-          ownerId: form.userId,
-          isArchived: form.isArchived,
         })
         .from(submission)
-        .innerJoin(form, eq(submission.formId, form.id))
-        .where(and(eq(submission.id, submissionId), this.respondentCondition(userId, respondentId)))
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.formId, submissionReference.formId),
+          this.respondentCondition(userId, respondentId),
+        ))
         .limit(1)
         .for("update");
-      if (!existing) throw serviceError("NOT_FOUND", "Submission not found");
-      if (existing.isArchived || !existing.ownerId) throw serviceError("NOT_FOUND", "Submission not found");
-      assertFormAccess(existing.accessPolicy, userId);
+      if (!existing) throw serviceError("NOT_FOUND", "Form no longer available");
       if (existing.submissionRecord.status !== "filling") {
         throw serviceError("CONFLICT", "Submission is already finalized");
       }
@@ -394,17 +443,30 @@ export default class SubmissionService {
     const { submissionId, userId, respondentId } = await updateLastActivitySchema.parseAsync(input);
     const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
     if (existing.status !== "filling") throw serviceError("CONFLICT", "Submission is already finalized");
-    const [updatedSubmission] = await db
-      .update(submission)
-      .set({ lastActivity: new Date() })
-      .where(and(
-        eq(submission.id, submissionId),
-        eq(submission.status, "filling"),
-        this.respondentCondition(userId, respondentId),
-      ))
-      .returning();
-    if (!updatedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
-    return updatedSubmission;
+    return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+        .select({
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
+        .from(form)
+        .where(eq(form.id, existing.formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+      const [updatedSubmission] = await tx
+        .update(submission)
+        .set({ lastActivity: new Date() })
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.status, "filling"),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .returning();
+      if (!updatedSubmission) throw serviceError("NOT_FOUND", "Submission not found");
+      return updatedSubmission;
+    });
   }
 
   public async submitForm(input: submitFormSchemaType) {
@@ -418,23 +480,6 @@ export default class SubmissionService {
       : [`submission:${existing.formId}:respondent:${respondentId}`];
 
     return db.transaction(async (tx) => {
-      await this.lockSubmissionIdentities(tx, [
-        ...identities,
-        `submission-form-limit:${existing.formId}`,
-      ]);
-      const [currentSubmission] = await tx
-        .select()
-        .from(submission)
-        .where(and(
-          eq(submission.id, submissionId),
-          eq(submission.formId, existing.formId),
-          this.respondentCondition(userId, respondentId),
-        ))
-        .for("update");
-      if (!currentSubmission) throw serviceError("NOT_FOUND", "Submission not found");
-      if (currentSubmission.status === "submitted") return currentSubmission;
-      if (currentSubmission.status !== "filling") throw serviceError("CONFLICT", "Submission is already finalized");
-
       const [formSettings] = await tx
         .select({
           currentVersion: form.currentVersion,
@@ -449,8 +494,25 @@ export default class SubmissionService {
         .from(form)
         .where(eq(form.id, existing.formId))
         .for("share");
-      if (!formSettings) throw serviceError("NOT_FOUND", "Form not found");
-      if (formSettings.isArchived || !formSettings.ownerId) throw serviceError("NOT_FOUND", "Form not found");
+      if (!formSettings) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formSettings.isPublished, formSettings.isArchived, formSettings.ownerId);
+      await this.lockSubmissionIdentities(tx, [
+        ...identities,
+        `submission-form-limit:${existing.formId}`,
+      ]);
+
+      const [currentSubmission] = await tx
+        .select()
+        .from(submission)
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.formId, existing.formId),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .for("update");
+      if (!currentSubmission) throw serviceError("NOT_FOUND", "Submission not found");
+      if (currentSubmission.status === "submitted") return currentSubmission;
+      if (currentSubmission.status !== "filling") throw serviceError("CONFLICT", "Submission is already finalized");
       if (!formSettings.isPublished) throw serviceError("FORBIDDEN", "Form is not published");
       if (!formSettings.isOpen) throw serviceError("FORBIDDEN", "Form is closed");
       assertFormAccess(formSettings.accessPolicy, userId);
@@ -589,17 +651,30 @@ export default class SubmissionService {
     const existing = await this.getSubmissionById({ submissionId, userId, respondentId });
     if (existing.status !== "filling") return existing;
 
-    const [updatedSubmission] = await db
-      .update(submission)
-      .set({ status: "not_submitted", lastActivity: new Date() })
-      .where(and(
-        eq(submission.id, submissionId),
-        eq(submission.status, "filling"),
-        this.respondentCondition(userId, respondentId),
-      ))
-      .returning();
-    if (!updatedSubmission) throw serviceError("INTERNAL_SERVER_ERROR", "Failed to mark submission as not submitted");
-    return updatedSubmission;
+    return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+        .select({
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
+        .from(form)
+        .where(eq(form.id, existing.formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+      const [updatedSubmission] = await tx
+        .update(submission)
+        .set({ status: "not_submitted", lastActivity: new Date() })
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.status, "filling"),
+          this.respondentCondition(userId, respondentId),
+        ))
+        .returning();
+      if (!updatedSubmission) throw serviceError("CONFLICT", "Submission is already finalized");
+      return updatedSubmission;
+    });
   }
 
   public async markInactiveSubmissionsNotSubmitted() {
@@ -617,7 +692,26 @@ export default class SubmissionService {
     if (!userId && !respondentId) {
       throw serviceError("UNAUTHORIZED", "A valid respondent identity is required");
     }
+    const [submissionReference] = await db
+      .select({ formId: submission.formId })
+      .from(submission)
+      .where(eq(submission.id, submissionId))
+      .limit(1);
+    if (!submissionReference) throw serviceError("NOT_FOUND", "Form no longer available");
+
     return db.transaction(async (tx) => {
+      const [formAccess] = await tx
+        .select({
+          ownerId: form.userId,
+          isPublished: form.isPublished,
+          isArchived: form.isArchived,
+        })
+        .from(form)
+        .where(eq(form.id, submissionReference.formId))
+        .for("share");
+      if (!formAccess) throw serviceError("NOT_FOUND", "Form no longer available");
+      this.assertPublicFormAvailable(formAccess.isPublished, formAccess.isArchived, formAccess.ownerId);
+
       const [existingSubmission] = await tx
         .select({
           userId: submission.userId,
@@ -627,7 +721,10 @@ export default class SubmissionService {
         })
         .from(submission)
         .innerJoin(form, eq(submission.formId, form.id))
-        .where(eq(submission.id, submissionId))
+        .where(and(
+          eq(submission.id, submissionId),
+          eq(submission.formId, submissionReference.formId),
+        ))
         .for("update");
       const isRespondent =
         Boolean(userId && existingSubmission?.userId === userId) ||

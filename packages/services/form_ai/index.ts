@@ -8,6 +8,7 @@ import { getOpenAiClient } from "./client";
 import { formGenerationRequested, inngest } from "./inngest-client";
 import { serviceError } from "../errors";
 import { env } from "../env";
+import { deriveFormLifecycle } from "../form/model";
 import {
   formGenerationJobOutput,
   GeneratedFieldsValidationError,
@@ -42,6 +43,16 @@ export default class FormAiService {
     const now = new Date();
     const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const job = await db.transaction(async (tx) => {
+      const [ownedForm] = await tx
+        .select({ id: form.id, isPublished: form.isPublished, isArchived: form.isArchived })
+        .from(form)
+        .where(and(eq(form.id, formId), eq(form.userId, userId)))
+        .for("update");
+      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
+      if (deriveFormLifecycle(ownedForm.isPublished, ownedForm.isArchived) === "archived") {
+        throw serviceError("CONFLICT", "Archived forms cannot be changed");
+      }
+
       const lockKeys = [
         `form-generation:form:${formId}`,
         `form-generation:user:${userId}:${dayStart.toISOString().slice(0, 10)}`,
@@ -49,12 +60,6 @@ export default class FormAiService {
       for (const key of lockKeys) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
       }
-
-      const [ownedForm] = await tx
-        .select({ id: form.id })
-        .from(form)
-        .where(and(eq(form.id, formId), eq(form.userId, userId), eq(form.isArchived, false)));
-      if (!ownedForm) throw serviceError("NOT_FOUND", "Form not found");
 
       const [activeJob] = await tx
         .select({ id: formGenerationJob.id })
@@ -137,7 +142,6 @@ export default class FormAiService {
       .select()
       .from(formGenerationJob)
       .where(eq(formGenerationJob.id, jobId));
-    if (!job) throw serviceError("NOT_FOUND", "Form generation job not found");
     return job;
   }
 
@@ -192,14 +196,35 @@ export default class FormAiService {
   public async completeGeneration(jobId: string, fields: GeneratedFields) {
     const validatedFields = generatedFieldsSchema.parse(fields);
     return db.transaction(async (tx) => {
+      const [jobReference] = await tx
+        .select({ formId: formGenerationJob.formId })
+        .from(formGenerationJob)
+        .where(eq(formGenerationJob.id, jobId));
+      if (!jobReference) return undefined;
+
+      const [generationForm] = await tx
+        .select({ isPublished: form.isPublished, isArchived: form.isArchived })
+        .from(form)
+        .where(eq(form.id, jobReference.formId))
+        .for("update");
+      if (!generationForm) return undefined;
+
       const [job] = await tx
         .select()
         .from(formGenerationJob)
         .where(eq(formGenerationJob.id, jobId))
         .for("update");
-      if (!job) throw serviceError("NOT_FOUND", "Form generation job not found");
+      if (!job) return undefined;
       if (job.status === "completed") return job;
       if (job.status === "failed") throw serviceError("CONFLICT", "Form generation job has failed");
+      if (deriveFormLifecycle(generationForm.isPublished, generationForm.isArchived) === "archived") {
+        const [failedJob] = await tx
+          .update(formGenerationJob)
+          .set({ status: "failed", error: "Archived forms cannot be changed" })
+          .where(eq(formGenerationJob.id, jobId))
+          .returning();
+        return failedJob;
+      }
 
       await formFields.createGeneratedFieldsInTransaction(
         tx,

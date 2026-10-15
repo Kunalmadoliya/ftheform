@@ -14,22 +14,46 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { ThemeToggle } from "~/components/theme-toggle";
-import { useForm } from "~/hooks/form/use-form";
+import { useForm, useFormLifecycle, type FormLifecycleFilter } from "~/hooks/form/use-form";
 import { authClient } from "~/lib/auth-client";
 import Link from "next/link";
 import { useSubmissionsAcrossForms } from "~/hooks/form/use-submissions-across-forms";
 import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
+function getTrpcCode(error: unknown) {
+  if (typeof error !== "object" || error === null || !("data" in error)) return undefined;
+  const data = error.data;
+  if (typeof data !== "object" || data === null || !("code" in data)) return undefined;
+  return typeof data.code === "string" ? data.code : undefined;
+}
+
 export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean }) {
   const router = useRouter();
   const { data: session, isPending: isSessionPending } = authClient.useSession();
-  const { createFormAsync, deleteFormAsync, forms, formsQuery, isPending, renameFormAsync, updateFormDescriptionAsync, publishFormAsync, unpublishFormAsync } = useForm();
+  const { createFormAsync, forms, formsQuery, isPending, renameFormAsync, updateFormDescriptionAsync, publishFormAsync, unpublishFormAsync } = useForm();
+  const [lifecycle, setLifecycle] = useState<FormLifecycleFilter>("live");
+  const lifecycleData = useFormLifecycle(lifecycle);
   const submissionData = useSubmissionsAcrossForms(forms.map(({ id, title }) => ({ id, title })));
-  const [dialog, setDialog] = useState<"edit" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "delete" | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [editingFormId, setEditingFormId] = useState("");
   const [error, setError] = useState("");
+  const [deletingForm, setDeletingForm] = useState<FormSummary | null>(null);
+  const [deletionPreview, setDeletionPreview] = useState<{
+    submittedCount: number;
+    inProgressCount: number;
+    isPublished: boolean;
+    isArchived: boolean;
+  } | null>(null);
+  const [deleteTitleConfirmation, setDeleteTitleConfirmation] = useState("");
+  const [exportedSubmittedCount, setExportedSubmittedCount] = useState<number | null>(null);
+  const [requiresCsvRefresh, setRequiresCsvRefresh] = useState(false);
+  const [mustDeleteUsingExport, setMustDeleteUsingExport] = useState(false);
+  const [deletionError, setDeletionError] = useState("");
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!isSessionPending && !session?.user) router.replace("/login");
@@ -59,12 +83,108 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
     }
   }
 
-  async function handleDelete(formId: string) {
-    if (!window.confirm("Archive this form? It will stop accepting responses, but collected response history will be preserved.")) return;
+  async function handleArchive(formId: string) {
     try {
-      await deleteFormAsync({ formId });
+      await lifecycleData.archiveFormAsync({ formId });
+    } catch (archiveError) {
+      setError(getTrpcErrorMessage(archiveError, "Unable to archive the form."));
+    }
+  }
+
+  async function handleRestore(formId: string) {
+    try {
+      await lifecycleData.restoreFormAsync({ formId });
+    } catch (restoreError) {
+      setError(getTrpcErrorMessage(restoreError, "Unable to restore the form."));
+    }
+  }
+
+  async function handleDelete(formId: string) {
+    const formToDelete = lifecycleData.formsQuery.data?.forms.find((form) => form.id === formId);
+    if (!formToDelete) return;
+    setDeletingForm(formToDelete);
+    setDeletionPreview(null);
+    setExportedSubmittedCount(null);
+    setRequiresCsvRefresh(false);
+    setMustDeleteUsingExport(false);
+    setDeleteTitleConfirmation("");
+    setDeletionError("");
+    setIsLoadingPreview(true);
+    setDialog("delete");
+    try {
+      const preview = await lifecycleData.getDeletionPreview(formId);
+      setDeletionPreview(preview);
+    } catch (previewError) {
+      setDeletionError(getTrpcErrorMessage(previewError, "Unable to check the form's responses."));
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  }
+
+  function downloadCsv(csv: string, formTitle: string) {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${formTitle.replace(/[^\w-]+/g, "-")}-responses.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function handleExportCsv() {
+    if (!deletingForm) return;
+    setIsExporting(true);
+    setDeletionError("");
+    try {
+      const exported = await lifecycleData.exportCsv(deletingForm.id);
+      downloadCsv(exported.csv, deletingForm.title);
+      setExportedSubmittedCount(exported.submittedCount);
+      setRequiresCsvRefresh(false);
+    } catch (exportError) {
+      setDeletionError(getTrpcErrorMessage(exportError, "Unable to export responses."));
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handlePermanentDelete(expectedSubmittedCount: number) {
+    if (!deletingForm) return;
+    setIsDeleting(true);
+    setDeletionError("");
+    try {
+      await lifecycleData.deleteFormAsync({
+        formId: deletingForm.id,
+        ...(expectedSubmittedCount > 0
+          ? { confirmDeleteResponses: true, expectedSubmittedCount }
+          : {}),
+      });
+      setDialog(null);
+      setDeletingForm(null);
     } catch (deleteError) {
-      setError(getTrpcErrorMessage(deleteError, "Unable to delete the form."));
+      const code = getTrpcCode(deleteError);
+      if (code === "NOT_FOUND") {
+        setDialog(null);
+        setDeletingForm(null);
+        await lifecycleData.formsQuery.refetch();
+        await formsQuery.refetch();
+      } else if (code === "CONFLICT") {
+        setExportedSubmittedCount(null);
+        setRequiresCsvRefresh(true);
+        setMustDeleteUsingExport(true);
+        setDeletionError("New responses arrived or the response count changed. Export again before deleting.");
+        setIsLoadingPreview(true);
+        try {
+          setDeletionPreview(await lifecycleData.getDeletionPreview(deletingForm.id));
+        } catch (previewError) {
+          setDeletionError(getTrpcErrorMessage(previewError, "Refresh the response count and export again."));
+        } finally {
+          setIsLoadingPreview(false);
+        }
+      } else {
+        setDeletionError(getTrpcErrorMessage(deleteError, "Unable to permanently delete the form."));
+      }
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -87,8 +207,9 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
   async function handleSignOut() { await authClient.signOut(); router.replace("/"); }
   if (isSessionPending || !session?.user) return null;
 
-  const formSummaries = forms as FormSummary[];
+  const formSummaries = (lifecycleData.formsQuery.data?.forms ?? []) as FormSummary[];
   const visibleForms = showAllForms ? formSummaries : formSummaries.slice(0, 3);
+  const lifecycleCounts = lifecycleData.formsQuery.data?.counts ?? { live: 0, draft: 0, archived: 0 };
   const totalResponses = submissionData.entries.reduce(
     (total, entry) => total + entry.submissions.length,
     0,
@@ -111,24 +232,120 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
           </div>
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total forms" value={String(forms.length)} detail="In your workspace" />
-            <StatCard label="Published" value={String(forms.filter((form) => form.isPublished).length)} detail="Currently live" />
+            <StatCard label="Total forms" value={String(lifecycleCounts.live + lifecycleCounts.draft + lifecycleCounts.archived)} detail="In your workspace" />
+            <StatCard label="Live" value={String(lifecycleCounts.live)} detail="Currently accepting responses" />
             <StatCard label="Responses" value={String(totalResponses)} detail="Submitted responses" />
             <StatCard label="Response rate" value={`${responseRate}%`} detail={`${totalViews} total views`} />
           </div>
           <section className="space-y-4">
-            <div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold">{showAllForms ? "Your forms" : "Recent forms"}</h2><p className="mt-1 text-sm text-muted-foreground">Create, edit, and share your forms.</p></div><div className="flex items-center gap-3">{formsQuery.isPending ? <span className="text-sm text-muted-foreground">Loading...</span> : null}{!showAllForms ? <Link href="/forms" className="text-sm font-medium text-primary hover:underline">View all →</Link> : null}</div></div>
-            {formsQuery.isError ? (
+            <div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold">{showAllForms ? "Your forms" : "Recent forms"}</h2><p className="mt-1 text-sm text-muted-foreground">Create, edit, and share your forms.</p></div><div className="flex items-center gap-3">{lifecycleData.formsQuery.isPending ? <span className="text-sm text-muted-foreground">Loading...</span> : null}{!showAllForms ? <Link href="/forms" className="text-sm font-medium text-primary hover:underline">View all →</Link> : null}</div></div>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Form lifecycle">
+              {(["live", "draft", "archived"] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  type="button"
+                  role="tab"
+                  aria-selected={lifecycle === filter}
+                  variant={lifecycle === filter ? "default" : "outline"}
+                  onClick={() => setLifecycle(filter)}
+                >
+                  {filter === "live" ? "Live" : filter === "draft" ? "Draft" : "Archived"}
+                  <span className="ml-1">{lifecycleCounts[filter]}</span>
+                </Button>
+              ))}
+            </div>
+            {lifecycleData.formsQuery.isError ? (
               <p className="text-sm text-destructive" role="alert">Unable to load your forms.</p>
             ) : (
-              <FormsGrid forms={visibleForms} onEdit={openEdit} onDelete={handleDelete} onPublish={handlePublish} onUnpublish={handleUnpublish} />
+              <FormsGrid forms={visibleForms} onEdit={openEdit} onDelete={handleDelete} onArchive={handleArchive} onRestore={handleRestore} onPublish={handlePublish} onUnpublish={handleUnpublish} />
             )}
           </section>
         </div>
       </main>
-      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
-        <DialogContent><DialogHeader><DialogTitle>Edit form</DialogTitle><DialogDescription>Give your form a clear purpose so people know how to respond.</DialogDescription></DialogHeader>
-          <form className="space-y-4" onSubmit={handleEditSubmit}><div className="space-y-2"><Label htmlFor="form-title">Title</Label><Input id="form-title" value={title} onChange={(event) => setTitle(event.target.value)} required /></div><div className="space-y-2"><Label htmlFor="form-description">Description</Label><Textarea id="form-description" value={description} onChange={(event) => setDescription(event.target.value)} /></div>{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}<DialogFooter><Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save form"}</Button></DialogFooter></form>
+      <Dialog open={dialog !== null} onOpenChange={(open) => {
+        if (!open && !isDeleting) {
+          setDialog(null);
+          setDeletingForm(null);
+        }
+      }}>
+        <DialogContent>
+          {dialog === "edit" ? (
+            <>
+              <DialogHeader><DialogTitle>Edit form</DialogTitle><DialogDescription>Give your form a clear purpose so people know how to respond.</DialogDescription></DialogHeader>
+              <form className="space-y-4" onSubmit={handleEditSubmit}>
+                <div className="space-y-2"><Label htmlFor="form-title">Title</Label><Input id="form-title" value={title} onChange={(event) => setTitle(event.target.value)} required /></div>
+                <div className="space-y-2"><Label htmlFor="form-description">Description</Label><Textarea id="form-description" value={description} onChange={(event) => setDescription(event.target.value)} /></div>
+                {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+                <DialogFooter><Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save form"}</Button></DialogFooter>
+              </form>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Delete {deletingForm?.title ?? "form"} permanently?</DialogTitle>
+                <DialogDescription>
+                  {deletionPreview?.submittedCount === 0
+                    ? "This permanently deletes the form and any in-progress responses. This cannot be undone."
+                    : `This permanently deletes the form and all ${deletionPreview?.submittedCount ?? 0} submitted responses. This cannot be undone.`}
+                </DialogDescription>
+              </DialogHeader>
+              {isLoadingPreview ? <p className="text-sm text-muted-foreground">Checking responses...</p> : null}
+              {deletionPreview && deletionPreview.submittedCount > 0 ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="delete-form-title">Type “{deletingForm?.title}” to confirm</Label>
+                    <Input
+                      id="delete-form-title"
+                      value={deleteTitleConfirmation}
+                      onChange={(event) => setDeleteTitleConfirmation(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {deletionPreview.inProgressCount > 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {deletionPreview.inProgressCount} in-progress response(s) will also be deleted.
+                    </p>
+                  ) : null}
+                  <DialogFooter>
+                    <Button
+                      variant="destructive"
+                      disabled={isDeleting || isExporting || requiresCsvRefresh || mustDeleteUsingExport || deleteTitleConfirmation !== deletingForm?.title}
+                      onClick={() => void handlePermanentDelete(deletionPreview.submittedCount)}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete form and all responses"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={isDeleting || isExporting}
+                      onClick={() => void handleExportCsv()}
+                    >
+                      {isExporting ? "Exporting..." : "Download CSV, then delete"}
+                    </Button>
+                    {exportedSubmittedCount !== null ? (
+                      <Button
+                        variant="destructive"
+                        disabled={isDeleting || isExporting || deleteTitleConfirmation !== deletingForm?.title}
+                        onClick={() => void handlePermanentDelete(exportedSubmittedCount)}
+                      >
+                        {isDeleting ? "Deleting..." : "Delete after CSV download"}
+                      </Button>
+                    ) : null}
+                  </DialogFooter>
+                </div>
+              ) : deletionPreview ? (
+                <DialogFooter>
+                  <Button
+                    variant="destructive"
+                    disabled={isDeleting}
+                    onClick={() => void handlePermanentDelete(0)}
+                  >
+                    {isDeleting ? "Deleting..." : "Delete form"}
+                  </Button>
+                </DialogFooter>
+              ) : null}
+              {deletionError ? <p className="text-sm text-destructive" role="alert">{deletionError}</p> : null}
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

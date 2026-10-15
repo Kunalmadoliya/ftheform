@@ -19,6 +19,7 @@ export const generateFormFieldsFunction = inngest.createFunction(
     const job = await step.run("load-generation-job", () =>
       formAiServiceInstance.getJobForProcessing(event.data.jobId),
     );
+    if (!job) return { status: "completed" };
     if (job.status === "completed") return { status: "completed" };
     if (job.status === "failed") throw new NonRetriableError("Form generation job has failed");
     if (!env.OPENAI_API_KEY) {

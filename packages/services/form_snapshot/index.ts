@@ -12,6 +12,7 @@ import { formSnapshot, form, formField } from "@repo/database/models/form-schema
 import { and, asc, db, desc, eq } from "@repo/database";
 import { assertFormAccess } from "../form/access";
 import { serviceError } from "../errors";
+import { deriveFormLifecycle } from "../form/model";
 
 type SnapshotTransaction = Pick<typeof db, "select" | "insert">;
 
@@ -32,10 +33,13 @@ export default class FormSnapshotService {
       .where(eq(form.id, formId))
       .limit(1);
 
-    if (!checkForm) {
-      throw serviceError("NOT_FOUND", "Form not found");
+    if (
+      !checkForm ||
+      !checkForm.ownerId ||
+      deriveFormLifecycle(checkForm.isPublished, checkForm.isArchived) === "archived"
+    ) {
+      throw serviceError("NOT_FOUND", "Form no longer available");
     }
-    if (checkForm.isArchived || !checkForm.ownerId) throw serviceError("NOT_FOUND", "Form not found");
     const isOwner = Boolean(userId && checkForm.ownerId === userId);
     if (!checkForm.isPublished && !isOwner) throw serviceError("FORBIDDEN", "Form is not published");
     if (!checkForm.isOpen && !isOwner) throw serviceError("FORBIDDEN", "Form is closed");

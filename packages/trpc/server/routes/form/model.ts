@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formLifecycleSchema } from "@repo/services/form/model";
 
 const formOutput = z.object({
   id: z.string(),
@@ -73,6 +74,42 @@ export const deleteFormOutput = z.object({
 });
 
 export const listFormsByUserOutput = z.array(formOutput);
+export const lifecycleFormOutput = formOutput.extend({
+  lifecycle: formLifecycleSchema,
+  submittedCount: z.number(),
+});
+export const listFormsByLifecycleInput = z.object({
+  lifecycle: formLifecycleSchema,
+});
+export const listFormsByLifecycleOutput = z.object({
+  forms: z.array(lifecycleFormOutput),
+  counts: z.object({
+    live: z.number(),
+    draft: z.number(),
+    archived: z.number(),
+  }),
+});
+export const archiveFormInput = z.object({ formId: z.string().uuid() });
+export const archiveFormOutput = formOutput.extend({ lifecycle: formLifecycleSchema });
+export const restoreFormInput = archiveFormInput;
+export const restoreFormOutput = archiveFormOutput;
+export const formDeletionPreviewInput = z.object({ formId: z.string().uuid() });
+export const formDeletionPreviewOutput = z.object({
+  submittedCount: z.number(),
+  inProgressCount: z.number(),
+  isPublished: z.boolean(),
+  isArchived: z.boolean(),
+});
+export const permanentlyDeleteFormInput = z.object({
+  formId: z.string().uuid(),
+  confirmDeleteResponses: z.boolean().optional(),
+  expectedSubmittedCount: z.number().int().min(0).optional(),
+});
+export const exportFormCsvInput = formDeletionPreviewInput;
+export const exportFormCsvOutput = z.object({
+  csv: z.string(),
+  submittedCount: z.number(),
+});
 
 export const toggleFormOpenInput = z.object({
   formId: z.string().describe("The id of the form"),
