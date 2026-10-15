@@ -23,7 +23,7 @@ services:
       target: migrator
     environment:
       NODE_ENV: ${NODE_ENV:?Set NODE_ENV in .env}
-      DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresdb:5432/${POSTGRES_DB}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
       WEB_URL: ${WEB_URL:?Set WEB_URL in .env}
@@ -43,8 +43,8 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:?Set NODE_ENV in .env}
-      PORT: ${PORT:?Set PORT in .env}
-      DATABASE_URL: ${PROD_DATABASE_URL:?Set PROD_DATABASE_URL with host postgresdb in .env}
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresdb:5432/${POSTGRES_DB}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       RESPONDENT_COOKIE_SECRET: ${RESPONDENT_COOKIE_SECRET:?Set RESPONDENT_COOKIE_SECRET in .env}
       BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
@@ -61,7 +61,7 @@ services:
       INNGEST_SIGNING_KEY: ${INNGEST_SIGNING_KEY:-}
       LOGGER_LEVEL: ${LOGGER_LEVEL:-info}
     ports:
-      - "127.0.0.1:${PORT}:${PORT}"
+      - "127.0.0.1:4000:4000"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -86,9 +86,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: ${WEB_PORT:?Set WEB_PORT in .env}
+      PORT: "3000"
     ports:
-      - "127.0.0.1:${WEB_PORT}:${WEB_PORT}"
+      - "127.0.0.1:3000:3000"
     depends_on:
       api:
         condition: service_healthy

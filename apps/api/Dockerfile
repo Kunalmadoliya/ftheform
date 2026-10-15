@@ -1,5 +1,5 @@
 FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
 WORKDIR /repo
 
 FROM base AS pruner
@@ -18,6 +18,8 @@ CMD ["pnpm", "--filter", "@repo/database", "db:migrate"]
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=4000
+EXPOSE 4000
 COPY --from=builder --chown=node:node /repo/apps/api/dist ./dist
 USER node
 CMD ["node", "dist/index.js"]

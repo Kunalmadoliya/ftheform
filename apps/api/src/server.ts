@@ -45,7 +45,7 @@ app.all("/api/auth/{*splat}", toNodeHandler(auth));
 // JSON parser for every other route, after the auth handler
 app.use(express.json({ limit: "256kb" }));
 app.use(
-  "/api/inngest",
+  `/api/inngest`,
   serveInngest({
     client: inngest,
     functions: [

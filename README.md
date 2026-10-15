@@ -37,12 +37,14 @@ The API allows browser requests only from `WEB_URL`; Better Auth uses the same o
 
 Set `RESPONDENT_COOKIE_SECRET` to a separate random value of at least 32 characters; it signs respondent identity cookies and must be shared by every API instance. Prefer hosting the web app and API under the same site (for example, `forms.example.com` and `api.example.com`): the respondent cookie can then use `SameSite=Lax`. When the web and API are on different sites, production uses `SameSite=None; Secure`, which requires HTTPS and may be restricted by browser third-party-cookie policies.
 
-After configuring `.env`, start the database and apply migrations:
+After configuring `.env`, start only the local database and apply migrations:
 
 ```bash
 pnpm db:up
 pnpm db:migrate
 ```
+
+To run the complete containerized stack instead of the local development processes, use `docker compose up --build`.
 
 ## Development
 
@@ -51,7 +53,7 @@ pnpm --filter @repo/api dev
 pnpm --filter web dev
 ```
 
-The web and API origins are `NEXT_PUBLIC_WEB_URL`/`WEB_URL` and `BASE_URL`, respectively. Set them to the development origins from `.env.example`; Next.js reads its port from its normal development-server default, and the API listens on `PORT`.
+The web and API origins are `NEXT_PUBLIC_WEB_URL`/`WEB_URL` and `BASE_URL`, respectively. Set them to the development origins from `.env.example`. The web runs on port 3000 and the API listens on port 4000; both package dev scripts load the root `.env`.
 
 ### AI form generation
 
@@ -110,9 +112,9 @@ Register these OAuth callback URLs with the providers:
 - `https://<RENDER_API_URL>/api/auth/callback/google`
 - `https://<RENDER_API_URL>/api/auth/callback/github`
 
-For local development, keep `DEV_DATABASE_URL` in your existing `.env`; the app selects it when `NODE_ENV=development`. For production, Render should use `DATABASE_URL` directly. Drizzle tooling also accepts `PROD_DATABASE_URL` when `NODE_ENV=production`, which is useful for the existing Compose setup. To explicitly run a migration against Neon from PowerShell, set `$env:DATABASE_URL` to the Neon connection string in that shell before `pnpm db:migrate`.
+For local development, set `DATABASE_URL` in the root `.env` to the host PostgreSQL URL (normally `localhost:5432`). For production, Render should use `DATABASE_URL` directly. To explicitly run a migration against Neon from PowerShell, set `$env:DATABASE_URL` to the Neon connection string in that shell before `pnpm db:migrate`.
 
-The API rejects production configuration unless both public origins use HTTPS and neither points to localhost. Apply database migrations before serving traffic. For the included Compose setup, set `PROD_DATABASE_URL` to the database service URL and use the development/database settings from `.env.example`; provision the separate Compose database before starting the stack.
+The API rejects production configuration unless both public origins use HTTPS and neither points to localhost. Apply database migrations before serving traffic. The included Compose setup starts PostgreSQL, runs migrations against the configured `POSTGRES_DB`, and then starts the API and web app on ports 4000 and 3000.
 
 The interactive `/docs` page is enabled only in development.
 
