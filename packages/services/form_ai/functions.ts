@@ -3,7 +3,7 @@ import { inngest } from "./inngest-client";
 import { formAiServiceInstance, safeGenerationError } from "./index";
 import { isOpenAiConfigurationError } from "./client";
 import { env } from "../env";
-import type { GeneratedFields } from "./model";
+import { GeneratedFieldsValidationError, type GeneratedFields } from "./model";
 
 export const generateFormFieldsFunction = inngest.createFunction(
   {
@@ -37,6 +37,9 @@ export const generateFormFieldsFunction = inngest.createFunction(
     } catch (error) {
       if (isOpenAiConfigurationError(error)) {
         throw new NonRetriableError("OpenAI rejected the configured API credentials or model.");
+      }
+      if (error instanceof GeneratedFieldsValidationError) {
+        throw new NonRetriableError(error.message);
       }
       throw error;
     }

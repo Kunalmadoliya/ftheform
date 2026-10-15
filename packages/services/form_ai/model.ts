@@ -108,6 +108,80 @@ export const openAiGeneratedFieldsSchema = z.strictObject({
     .max(20),
 });
 
+type OpenAiGeneratedField = z.infer<typeof openAiGeneratedFieldsSchema>["fields"][number];
+type GeneratedConfigKey = keyof OpenAiGeneratedField["config"];
+
+const configKeysByType: Record<OpenAiGeneratedField["type"], GeneratedConfigKey[]> = {
+  text: ["placeholder"],
+  textarea: ["placeholder"],
+  email: ["placeholder"],
+  number: ["min", "max"],
+  select: ["options"],
+  multiselect: ["options"],
+  checkbox: [],
+  rating: ["maxStars"],
+  date: ["minDate", "maxDate"],
+};
+
+export class GeneratedFieldsValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeneratedFieldsValidationError";
+  }
+}
+
+export function normalizeOpenAiGeneratedFields(response: unknown): GeneratedFields {
+  const parsedResponse = openAiGeneratedFieldsSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    const issues = parsedResponse.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+    throw new GeneratedFieldsValidationError(
+      `The AI returned malformed structured form fields: ${issues}`,
+    );
+  }
+
+  const fields = parsedResponse.data.fields.map((field) => {
+    const allowedKeys = configKeysByType[field.type];
+    const unsupportedKeys = Object.entries(field.config)
+      .filter(
+        ([key, value]) =>
+          value !== null && !allowedKeys.some((allowedKey) => allowedKey === key),
+      )
+      .map(([key]) => key);
+    if (unsupportedKeys.length > 0) {
+      throw new GeneratedFieldsValidationError(
+        `The AI returned unsupported configuration for ${field.type}: ${unsupportedKeys.join(", ")}`,
+      );
+    }
+
+    const config = Object.fromEntries(
+      allowedKeys.flatMap((key) => {
+        const value = field.config[key];
+        return value === null ? [] : [[key, value]];
+      }),
+    );
+    return {
+      type: field.type,
+      category: field.category,
+      label: field.label,
+      required: field.required,
+      ...(Object.keys(config).length > 0 ? { config } : {}),
+    };
+  });
+
+  const validatedFields = generatedFieldsSchema.safeParse(fields);
+  if (!validatedFields.success) {
+    const issues = validatedFields.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+    throw new GeneratedFieldsValidationError(
+      `The AI returned invalid field configuration: ${issues}`,
+    );
+  }
+  return validatedFields.data;
+}
+
 export const startFormGenerationInput = z.strictObject({
   formId: z.string().uuid(),
   prompt: z.string().trim().min(8).max(2000),
