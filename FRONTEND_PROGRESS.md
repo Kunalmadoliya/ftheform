@@ -16,10 +16,10 @@
 
 ## Phase 6
 [x] 6.1 /admin page
-[ ] 6.2 workspace subpages restyle (responses, analytics, templates, workspace layout, per-form responses page)
+[x] 6.2 workspace subpages restyle (responses, analytics, templates, workspace layout, per-form responses page)
 
 ## Final
-[ ] F1 final consistency grep checks (section 8)
-[ ] F2 check-types passes
-[ ] F3 next build passes (run once)
-[ ] F4 final report sent
+[x] F1 final consistency grep checks (section 8)
+[x] F2 check-types passes
+[x] F3 next build passes (run once)
+[x] F4 final report sent

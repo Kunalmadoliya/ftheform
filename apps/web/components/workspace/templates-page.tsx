@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconCreate } from "~/components/icons/app-icons";
+import { IconCreate, IconSpinner } from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -145,39 +145,50 @@ export function TemplatesPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Start with a ready-made form</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Templates</h1>
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Presets</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Templates</h1>
+        <p className="mt-1 text-xs text-muted-foreground">Start with a pre-configured form structure and customize it.</p>
       </div>
+
       {error ? (
-        <div className="space-y-2 text-sm text-destructive" role="alert">
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 font-mono text-xs text-destructive" role="alert">
           <p>{error}</p>
           {createdFormId ? (
-            <Button variant="link" className="h-auto p-0" onClick={() => router.push(`/forms/${createdFormId}/builder`)}>
+            <Button
+              variant="link"
+              className="mt-2 h-auto p-0 font-mono text-xs text-foreground underline underline-offset-4"
+              onClick={() => router.push(`/forms/${createdFormId}/builder`)}
+            >
               Open the partially created form
             </Button>
           ) : null}
         </div>
       ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {templates.map((template) => {
           const isCreating = creatingTemplateId === template.id;
           return (
-            <Card key={template.id} className="flex flex-col">
-              <CardHeader>
-                <CardTitle>{template.title}</CardTitle>
-                <CardDescription>{template.description}</CardDescription>
+            <Card key={template.id} className="flex flex-col rounded-2xl border-border bg-card shadow-none">
+              <CardHeader className="p-6">
+                <CardTitle className="text-base font-semibold text-foreground">{template.title}</CardTitle>
+                <CardDescription className="mt-1 font-mono text-xs text-muted-foreground">{template.description}</CardDescription>
               </CardHeader>
-              <CardContent className="mt-auto space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  {template.fields.length} fields
-                </p>
+              <CardContent className="mt-auto space-y-4 p-6 pt-0">
+                <div className="flex items-center justify-between border-t border-border pt-4 font-mono text-xs text-muted-foreground">
+                  <span>{template.fields.length} typed fields</span>
+                </div>
                 <Button
-                  className="w-full text-xs"
+                  className="w-full gap-2 font-mono text-xs"
                   size="sm"
                   disabled={Boolean(creatingTemplateId)}
                   onClick={() => void useTemplate(template)}
                 >
-                  <IconCreate className="size-3.5 mr-1.5" />
+                  {isCreating ? (
+                    <IconSpinner className="size-3.5 animate-spin" />
+                  ) : (
+                    <IconCreate className="size-3.5" />
+                  )}
                   {isCreating ? "Creating..." : "Use template"}
                 </Button>
               </CardContent>

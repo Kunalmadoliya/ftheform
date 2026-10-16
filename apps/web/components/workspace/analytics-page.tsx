@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import { StatCard } from "~/components/dashboard/stat-card";
 import { useFormResponses } from "~/hooks/form/use-form-responses";
 import { useFormSnapshots } from "~/hooks/form/use-form-snapshots";
@@ -60,21 +61,21 @@ function ChoiceDistribution({
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-medium">{field.label}</h4>
+      <h4 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{field.label}</h4>
       {options.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No answers recorded yet.</p>
+        <p className="font-mono text-xs text-muted-foreground">No answers recorded yet.</p>
       ) : (
         options.map((option) => {
           const count = counts.get(option) ?? 0;
           const percent = total > 0 ? Math.round((count / total) * 100) : 0;
           return (
             <div key={option} className="space-y-1">
-              <div className="flex justify-between gap-4 text-xs">
-                <span className="truncate">{option}</span>
+              <div className="flex justify-between gap-4 font-mono text-xs">
+                <span className="truncate text-foreground">{option}</span>
                 <span className="shrink-0 text-muted-foreground">{count} · {percent}%</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-foreground" style={{ width: `${percent}%` }} />
               </div>
             </div>
           );
@@ -121,14 +122,14 @@ function FormAnalyticsCard({
   const responseRate = form.views > 0 ? Math.round((submissions.length / form.views) * 100) : 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{form.title}</CardTitle>
-        <CardDescription>Performance and response details for this form.</CardDescription>
+    <Card className="rounded-2xl border-border bg-card shadow-none">
+      <CardHeader className="p-6">
+        <CardTitle className="text-base font-semibold text-foreground">{form.title}</CardTitle>
+        <CardDescription className="font-mono text-xs text-muted-foreground">Performance and response details for this form.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-7">
+      <CardContent className="space-y-7 p-6 pt-0">
         {submissionsQuery.isError || snapshotsQuery.isError || answersQuery.isError ? (
-          <p className="text-sm text-destructive" role="alert">
+          <p className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 font-mono text-xs text-destructive" role="alert">
             Unable to load analytics for this form.
           </p>
         ) : null}
@@ -138,19 +139,21 @@ function FormAnalyticsCard({
           <StatCard label="Response rate" value={`${responseRate}%`} detail="Submissions per view" />
         </div>
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold">Submissions over the last 14 days</h3>
-          <div className="flex h-36 items-end gap-1 border-b pb-1">
+          <h3 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Submissions over the last 14 days
+          </h3>
+          <div className="flex h-36 items-end gap-1.5 border-b border-border pb-2">
             {timeline.map((day) => (
               <div key={day.key} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                 <div
-                  className="w-full rounded-t-sm bg-primary/80"
+                  className="w-full rounded-t-sm bg-foreground/90 transition-all"
                   style={{ height: `${Math.max(day.count > 0 ? 8 : 0, (day.count / maxTimelineCount) * 100)}%` }}
                   title={`${day.label}: ${day.count}`}
                 />
               </div>
             ))}
           </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground">
+          <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
             <span>{timeline[0]?.label}</span>
             <span>{timeline.at(-1)?.label}</span>
           </div>
@@ -168,7 +171,7 @@ function FormAnalyticsCard({
             ))}
           </section>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="font-mono text-xs text-muted-foreground">
             Choice-field distributions will appear when this form has select fields.
           </p>
         )}
@@ -185,18 +188,32 @@ export function AnalyticsPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Form performance at a glance</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Analytics</h1>
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Metrics</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Analytics</h1>
+        <p className="mt-1 text-xs text-muted-foreground">Performance and engagement across your active forms.</p>
       </div>
-      {formsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading analytics...</p> : null}
-      {formsQuery.isError ? (
-        <p className="text-sm text-destructive" role="alert">Unable to load analytics.</p>
+
+      {formsQuery.isPending ? (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
       ) : null}
-      {!formsQuery.isPending && forms.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          Create a form to start seeing analytics.
+
+      {formsQuery.isError ? (
+        <p className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 font-mono text-xs text-destructive" role="alert">
+          Unable to load analytics.
         </p>
       ) : null}
+
+      {!formsQuery.isPending && forms.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+          <p className="font-mono text-xs text-muted-foreground">
+            Create a form to start seeing analytics.
+          </p>
+        </div>
+      ) : null}
+
       {forms.length > 0 ? (
         <>
           <StatCard label="Forms tracked" value={String(forms.length)} detail={`${totalViews} recorded views`} />

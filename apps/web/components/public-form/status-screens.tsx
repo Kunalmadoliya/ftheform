@@ -22,7 +22,7 @@ import {
 export function FormNotFoundScreen() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconForms className="size-6" />
         </div>
@@ -50,7 +50,7 @@ export function SignInRequiredScreen({ formUrl }: { formUrl: string }) {
   const returnTo = `/form/${encodeURIComponent(formUrl)}`;
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconPassword className="size-6" />
         </div>
@@ -74,7 +74,7 @@ export function SignInRequiredScreen({ formUrl }: { formUrl: string }) {
 export function AnonymousOnlyScreen({ onSignOut }: { onSignOut: () => Promise<void> }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconWarning className="size-6" />
         </div>
@@ -100,7 +100,7 @@ export function AnonymousOnlyScreen({ onSignOut }: { onSignOut: () => Promise<vo
 export function FormClosedScreen({ isLimit = false }: { isLimit?: boolean }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconWarning className="size-6" />
         </div>
@@ -120,7 +120,7 @@ export function FormClosedScreen({ isLimit = false }: { isLimit?: boolean }) {
 export function SnapshotUnavailableScreen() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconWarning className="size-6" />
         </div>
@@ -136,7 +136,7 @@ export function SnapshotUnavailableScreen() {
 export function SubmissionCompleteScreen({ alreadySubmitted = false }: { alreadySubmitted?: boolean }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
+      <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-none">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
           <IconCheck className="size-6" />
         </div>
