@@ -1,22 +1,32 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   BarChart3,
   CalendarDays,
   Check,
   CheckSquare,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CornerDownLeft,
   Copy,
   ExternalLink,
   Eye,
   FileText,
   Globe2,
+  GripVertical,
   Hash,
   LayoutDashboard,
   LayoutTemplate,
   ListChecks,
   Loader2,
   LockKeyhole,
+  LogIn,
+  LogOut,
   Mail,
   Menu,
   MessageSquare,
@@ -24,6 +34,9 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RotateCcw,
+  ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Sun,
@@ -62,9 +75,35 @@ export const IconSun = Sun;
 export const IconMoon = Moon;
 export const IconMenu = Menu;
 export const IconWarning = TriangleAlert;
+export const IconAdmin = ShieldCheck;
+
+// Structural & UI control icons
+export const IconArrowRight = ArrowRight;
+export const IconArrowUp = ArrowUp;
+export const IconArrowDown = ArrowDown;
+export const IconChevronLeft = ChevronLeft;
+export const IconChevronRight = ChevronRight;
+export const IconChevronUp = ChevronUp;
+export const IconChevronDown = ChevronDown;
+export const IconGrip = GripVertical;
+export const IconSliders = SlidersHorizontal;
+export const IconLogIn = LogIn;
+export const IconLogOut = LogOut;
+export const IconRotateCcw = RotateCcw;
+export const IconEnter = CornerDownLeft;
 
 // Field type icon registry
-export const fieldTypeIcons: Record<string, LucideIcon> = {
+export const fieldTypeIcons: Record<string, LucideIcon> & {
+  text: LucideIcon;
+  textarea: LucideIcon;
+  email: LucideIcon;
+  number: LucideIcon;
+  select: LucideIcon;
+  multiselect: LucideIcon;
+  checkbox: LucideIcon;
+  rating: LucideIcon;
+  date: LucideIcon;
+} = {
   text: Type,
   textarea: Text,
   email: Mail,

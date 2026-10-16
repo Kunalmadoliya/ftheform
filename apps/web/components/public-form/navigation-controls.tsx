@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { IconChevronLeft, IconChevronRight, IconSpinner } from "~/components/icons/app-icons";
 import { Button } from "~/components/ui/button";
 
 type NavigationControlsProps = {
@@ -43,7 +43,7 @@ export function NavigationControls({
             className="h-9 px-3 text-xs"
             aria-label="Previous question"
           >
-            <ChevronLeft className="size-3.5 mr-1" />
+            <IconChevronLeft className="size-3.5 mr-1" />
             Back
           </Button>
         ) : null}
@@ -60,7 +60,7 @@ export function NavigationControls({
               "Preview only"
             ) : isBusy ? (
               <>
-                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                <IconSpinner className="size-3.5 animate-spin mr-1.5" />
                 Submitting...
               </>
             ) : (
@@ -69,12 +69,12 @@ export function NavigationControls({
           ) : isIntro ? (
             <>
               Start
-              <ChevronRight className="size-3.5 ml-1" />
+              <IconChevronRight className="size-3.5 ml-1" />
             </>
           ) : (
             <>
               OK
-              <ChevronRight className="size-3.5 ml-1" />
+              <IconChevronRight className="size-3.5 ml-1" />
             </>
           )}
         </Button>

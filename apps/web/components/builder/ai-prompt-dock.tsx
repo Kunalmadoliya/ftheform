@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Check, CornerDownLeft, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import {
+  IconAi,
+  IconCheck,
+  IconEnter,
+  IconRotateCcw,
+  IconSpinner,
+} from "~/components/icons/app-icons";
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -134,7 +140,7 @@ export function AiPromptDock({ formId }: AiPromptDockProps) {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
         <div className="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-foreground">
-          <Sparkles className="size-3.5 text-foreground" />
+          <IconAi className="size-3.5 text-foreground" />
           <span>AI Assistant</span>
         </div>
         <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
@@ -157,17 +163,17 @@ export function AiPromptDock({ formId }: AiPromptDockProps) {
               <div className="flex items-center justify-between pt-1 font-mono text-[10px]">
                 {item.status === "pending" ? (
                   <span className="flex items-center gap-1 text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin text-foreground" />
+                    <IconSpinner className="size-3 animate-spin text-foreground" />
                     Pending...
                   </span>
                 ) : item.status === "running" ? (
                   <span className="flex items-center gap-1 text-foreground">
-                    <Loader2 className="size-3 animate-spin text-foreground" />
+                    <IconSpinner className="size-3 animate-spin text-foreground" />
                     Generating fields...
                   </span>
                 ) : item.status === "completed" ? (
                   <span className="flex items-center gap-1 text-foreground font-medium">
-                    <Check className="size-3 text-foreground" />
+                    <IconCheck className="size-3 text-foreground" />
                     Fields added
                   </span>
                 ) : (
@@ -182,7 +188,7 @@ export function AiPromptDock({ formId }: AiPromptDockProps) {
                     onClick={() => void triggerGeneration(item.prompt)}
                     className="inline-flex items-center gap-1 text-foreground underline hover:text-foreground/80 cursor-pointer"
                   >
-                    <RotateCcw className="size-2.5" />
+                    <IconRotateCcw className="size-2.5" />
                     Retry
                   </button>
                 ) : null}
@@ -220,9 +226,9 @@ export function AiPromptDock({ formId }: AiPromptDockProps) {
             aria-label="Send prompt to AI"
           >
             {isBusy ? (
-              <Loader2 className="size-3 animate-spin" />
+              <IconSpinner className="size-3 animate-spin" />
             ) : (
-              <CornerDownLeft className="size-3" />
+              <IconEnter className="size-3" />
             )}
           </Button>
         </div>

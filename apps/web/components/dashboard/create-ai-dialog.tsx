@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { IconAi, IconSpinner } from "~/components/icons/app-icons";
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -148,7 +148,7 @@ export function CreateAiDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-[var(--radius)] border border-border bg-muted">
-              <Sparkles className="size-3.5 text-foreground" />
+              <IconAi className="size-3.5 text-foreground" />
             </span>
             <DialogTitle>Create with AI</DialogTitle>
           </div>
@@ -198,7 +198,7 @@ export function CreateAiDialog({
 
           {isBusy ? (
             <div className="flex items-center gap-2.5 rounded-[var(--radius)] border border-border/80 bg-muted/40 p-3 text-xs text-muted-foreground">
-              <Loader2 className="size-4 animate-spin text-foreground shrink-0" />
+              <IconSpinner className="size-4 animate-spin text-foreground shrink-0" />
               <span>
                 {isCreating
                   ? "Initializing form..."
@@ -224,12 +224,12 @@ export function CreateAiDialog({
             >
               {isBusy ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <IconSpinner className="size-3.5 animate-spin" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-3.5" />
+                  <IconAi className="size-3.5" />
                   Generate form
                 </>
               )}

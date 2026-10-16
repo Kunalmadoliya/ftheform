@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { IconCheck } from "~/components/icons/app-icons";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { StarRating } from "~/components/forms/star-rating";
@@ -113,7 +113,7 @@ export function QuestionScreen({
                   : "border-border bg-background"
               }`}
             >
-              {value === true ? <Check className="size-3.5 stroke-[3]" /> : null}
+              {value === true ? <IconCheck className="size-3.5" /> : null}
             </div>
             <span className="text-sm font-medium text-foreground">{field.label}</span>
           </button>
@@ -204,7 +204,7 @@ export function QuestionScreen({
                         : "border-border bg-transparent"
                     }`}
                   >
-                    {isSelected ? <Check className="size-3 stroke-[3]" /> : null}
+                    {isSelected ? <IconCheck className="size-3" /> : null}
                   </div>
                 </button>
               );

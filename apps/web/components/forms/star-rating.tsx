@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star } from "lucide-react";
+import { IconRating } from "~/components/icons/app-icons";
 
 type StarRatingProps = {
   label: string;
@@ -52,7 +52,7 @@ export function StarRating({
             onBlur={() => setHoveredStar(undefined)}
             onClick={() => onChange(star)}
           >
-            <Star
+            <IconRating
               className={`size-5 transition-all duration-150 ${
                 isFilled ? "fill-foreground text-foreground" : "text-muted-foreground/50"
               }`}

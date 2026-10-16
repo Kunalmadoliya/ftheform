@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import {
+  IconArrowDown,
+  IconArrowUp,
+  IconCreate,
+  IconDelete,
+  fieldTypeIcons,
+} from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -64,9 +70,13 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
   return (
     <div className="space-y-5 p-4 text-xs">
       <div>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Properties
-        </span>
+        <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {(() => {
+            const FieldIcon = fieldTypeIcons[field.type];
+            return FieldIcon ? <FieldIcon className="size-3" /> : null;
+          })()}
+          <span>Properties</span>
+        </div>
         <h3 className="mt-0.5 text-sm font-semibold text-foreground">{field.label || "Untitled"}</h3>
       </div>
 
@@ -227,7 +237,7 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
                   setConfigValue("options", [...options, `Option ${options.length + 1}`])
                 }
               >
-                <Plus className="size-3 mr-1" />
+                <IconCreate className="size-3 mr-1" />
                 Add
               </Button>
             </div>
@@ -257,7 +267,7 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
                     }}
                     aria-label="Move option up"
                   >
-                    <ArrowUp className="size-3.5" />
+                    <IconArrowUp className="size-3.5" />
                   </Button>
                   <Button
                     type="button"
@@ -272,7 +282,7 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
                     }}
                     aria-label="Move option down"
                   >
-                    <ArrowDown className="size-3.5" />
+                    <IconArrowDown className="size-3.5" />
                   </Button>
                   <Button
                     type="button"
@@ -287,7 +297,7 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
                     }
                     aria-label={`Remove option ${index + 1}`}
                   >
-                    <Trash2 className="size-3.5" />
+                    <IconDelete className="size-3.5" />
                   </Button>
                 </div>
               ))}
@@ -309,7 +319,7 @@ export function FieldInspector({ field, onSave, onDelete }: FieldInspectorProps)
             className="w-full text-xs"
             onClick={() => void onDelete()}
           >
-            <Trash2 className="size-3.5 mr-1.5" />
+            <IconDelete className="size-3.5 mr-1.5" />
             Delete field
           </Button>
         </div>

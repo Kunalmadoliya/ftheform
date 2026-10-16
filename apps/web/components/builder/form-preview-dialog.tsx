@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Eye } from "lucide-react";
+import { IconCheck, IconPreview } from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -143,7 +143,7 @@ export function FormPreviewDialog({
         <DialogHeader className="border-b border-border bg-muted/30 p-5">
           <div className="flex items-center gap-2">
             <span className="flex size-6 items-center justify-center rounded-[var(--radius)] border border-border bg-background text-foreground">
-              <Eye className="size-3.5" />
+              <IconPreview className="size-3.5" />
             </span>
             <DialogTitle className="text-base font-semibold">{title || "Untitled form"}</DialogTitle>
           </div>
@@ -182,7 +182,7 @@ export function FormPreviewDialog({
               variant="secondary"
               disabled
             >
-              <Check className="size-3.5 mr-1" />
+              <IconCheck className="size-3.5 mr-1" />
               Preview mode — submissions disabled
             </Button>
           ) : null}

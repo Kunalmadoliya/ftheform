@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Globe2, Loader2 } from "lucide-react";
+import { IconCheck, IconCopy, IconPublish, IconSpinner } from "~/components/icons/app-icons";
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -56,7 +56,7 @@ export function ShareFormDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-[var(--radius)] border border-border bg-muted">
-              <Globe2 className="size-3.5 text-foreground" />
+              <IconPublish className="size-3.5 text-foreground" />
             </span>
             <DialogTitle>Share your form</DialogTitle>
           </div>
@@ -70,7 +70,7 @@ export function ShareFormDialog({
         <div className="space-y-3 py-2">
           {isPublishing ? (
             <div className="flex items-center gap-2.5 rounded-[var(--radius)] border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground">
-              <Loader2 className="size-4 animate-spin text-foreground shrink-0" />
+              <IconSpinner className="size-4 animate-spin text-foreground shrink-0" />
               <span>Publishing form to live URL...</span>
             </div>
           ) : displayedUrl ? (
@@ -89,7 +89,7 @@ export function ShareFormDialog({
                 aria-label="Copy public form link"
                 className="shrink-0 size-9"
               >
-                {copied ? <Check className="size-4 text-foreground" /> : <Copy className="size-4" />}
+                {copied ? <IconCheck className="size-4 text-foreground" /> : <IconCopy className="size-4" />}
               </Button>
             </div>
           ) : (

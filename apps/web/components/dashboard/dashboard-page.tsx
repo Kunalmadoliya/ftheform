@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FilePlus2, Loader2, LogOut, Plus, Sparkles } from "lucide-react";
+import {
+  IconAi,
+  IconArrowRight,
+  IconCreate,
+  IconLogOut,
+  IconSpinner,
+} from "~/components/icons/app-icons";
 
 import { SidebarNav } from "~/components/dashboard/sidebar-nav";
 import { FormsGrid } from "~/components/dashboard/forms-grid";
@@ -302,7 +308,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
               onClick={handleSignOut}
               className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
-              <LogOut className="size-3.5" />
+              <IconLogOut className="size-3.5" />
               Sign out
             </Button>
           </div>
@@ -329,7 +335,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
                 }}
                 className="h-9 gap-1.5 text-xs font-medium"
               >
-                <Sparkles className="size-3.5" />
+                <IconAi className="size-3.5" />
                 Create with AI
               </Button>
               <Button
@@ -340,12 +346,12 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
               >
                 {isPending ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <IconSpinner className="size-3.5 animate-spin" />
                     Creating...
                   </>
                 ) : (
                   <>
-                    <Plus className="size-3.5" />
+                    <IconCreate className="size-3.5" />
                     Create form
                   </>
                 )}
@@ -401,7 +407,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
                   className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   View all
-                  <ArrowRight className="size-3" />
+                  <IconArrowRight className="size-3" />
                 </Link>
               ) : null}
             </div>
@@ -544,7 +550,7 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
 
           {isLoadingPreview ? (
             <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin text-foreground" />
+              <IconSpinner className="size-3.5 animate-spin text-foreground" />
               <span>Checking response count...</span>
             </div>
           ) : null}

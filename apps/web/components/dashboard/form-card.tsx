@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  IconCopy,
+  IconDelete,
+  IconEdit,
+  IconMore,
+  IconOpenExternal,
+  IconResponses,
+} from "~/components/icons/app-icons";
 import { toast } from "sonner";
 
 import { Badge } from "~/components/ui/badge";
@@ -91,7 +98,7 @@ export function FormCard({
                 className="size-7 text-muted-foreground hover:text-foreground"
                 aria-label={`More actions for ${form.title}`}
               >
-                <MoreHorizontal className="size-4" />
+                <IconMore className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 text-xs">
@@ -99,12 +106,12 @@ export function FormCard({
                 <>
                   <DropdownMenuItem asChild>
                     <Link href={`/forms/${form.id}/responses`} className="cursor-pointer">
-                      <BarChart3 className="size-3.5 mr-2" />
+                      <IconResponses className="size-3.5 mr-2" />
                       View responses
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
-                    <Pencil className="size-3.5 mr-2" />
+                    <IconEdit className="size-3.5 mr-2" />
                     Edit details
                   </DropdownMenuItem>
                   {isLive ? (
@@ -114,7 +121,7 @@ export function FormCard({
                         disabled={!form.formUrl}
                         className="cursor-pointer"
                       >
-                        <Copy className="size-3.5 mr-2" />
+                        <IconCopy className="size-3.5 mr-2" />
                         Copy share link
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onUnpublish} className="cursor-pointer">
@@ -141,7 +148,7 @@ export function FormCard({
                 className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
                 onClick={onDelete}
               >
-                <Trash2 className="size-3.5 mr-2" />
+                <IconDelete className="size-3.5 mr-2" />
                 Delete permanently
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -184,7 +191,7 @@ export function FormCard({
           <>
             <Button asChild className="flex-1 h-8 text-xs font-medium">
               <Link href={`/forms/${form.id}/builder`}>
-                <Pencil className="size-3.5 mr-1.5" />
+                <IconEdit className="size-3.5 mr-1.5" />
                 Edit
               </Link>
             </Button>
@@ -201,7 +208,7 @@ export function FormCard({
                   rel="noopener noreferrer"
                   aria-label="Open public form"
                 >
-                  <ExternalLink className="size-3.5" />
+                  <IconOpenExternal className="size-3.5" />
                 </a>
               </Button>
             ) : (
@@ -212,7 +219,7 @@ export function FormCard({
                 disabled
                 aria-label="Open public form"
               >
-                <ExternalLink className="size-3.5" />
+                <IconOpenExternal className="size-3.5" />
               </Button>
             )}
           </>

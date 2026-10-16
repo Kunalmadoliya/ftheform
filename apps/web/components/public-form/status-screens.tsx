@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, FileQuestion, Lock, LogIn, LogOut, ShieldAlert } from "lucide-react";
+import {
+  IconCheck,
+  IconForms,
+  IconLogIn,
+  IconLogOut,
+  IconPassword,
+  IconWarning,
+} from "~/components/icons/app-icons";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -17,7 +24,7 @@ export function FormNotFoundScreen() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <FileQuestion className="size-6" />
+          <IconForms className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">Form not found</h1>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -45,7 +52,7 @@ export function SignInRequiredScreen({ formUrl }: { formUrl: string }) {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <Lock className="size-6" />
+          <IconPassword className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">Sign in to respond</h1>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -54,7 +61,7 @@ export function SignInRequiredScreen({ formUrl }: { formUrl: string }) {
         <div className="mt-6">
           <Button asChild className="w-full text-xs font-medium">
             <Link href={`/login?next=${encodeURIComponent(returnTo)}`}>
-              <LogIn className="size-3.5 mr-2" />
+              <IconLogIn className="size-3.5 mr-2" />
               Continue to sign in
             </Link>
           </Button>
@@ -69,7 +76,7 @@ export function AnonymousOnlyScreen({ onSignOut }: { onSignOut: () => Promise<vo
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <ShieldAlert className="size-6" />
+          <IconWarning className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">Anonymous responses only</h1>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -81,7 +88,7 @@ export function AnonymousOnlyScreen({ onSignOut }: { onSignOut: () => Promise<vo
             className="w-full text-xs font-medium"
             onClick={() => void onSignOut()}
           >
-            <LogOut className="size-3.5 mr-2" />
+            <IconLogOut className="size-3.5 mr-2" />
             Sign out
           </Button>
         </div>
@@ -95,7 +102,7 @@ export function FormClosedScreen({ isLimit = false }: { isLimit?: boolean }) {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <AlertCircle className="size-6" />
+          <IconWarning className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">
           {isLimit ? "This form has reached its response limit" : "This form is closed"}
@@ -115,7 +122,7 @@ export function SnapshotUnavailableScreen() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <AlertCircle className="size-6" />
+          <IconWarning className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">This form is unavailable</h1>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -131,7 +138,7 @@ export function SubmissionCompleteScreen({ alreadySubmitted = false }: { already
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-8 text-center shadow-xs">
         <div className="mx-auto flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/50 text-foreground">
-          <CheckCircle2 className="size-6" />
+          <IconCheck className="size-6" />
         </div>
         <h1 className="mt-5 text-lg font-semibold tracking-tight text-foreground">
           {alreadySubmitted ? "You already submitted a response" : "Response submitted"}

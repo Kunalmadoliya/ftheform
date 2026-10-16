@@ -3,18 +3,27 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, LayoutTemplate, MessageSquare } from "lucide-react";
+import { Logo } from "~/components/brand/logo";
+import {
+  IconAdmin,
+  IconAnalytics,
+  IconDashboard,
+  IconForms,
+  IconTemplates,
+  IconResponses,
+} from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import { trpc } from "~/trpc/client";
 import { useSubmissionsAcrossForms } from "~/hooks/form/use-submissions-across-forms";
+import { useUserRole } from "~/hooks/auth/use-user-role";
 
-const items = [
-  { label: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { label: "Forms", href: "/forms", icon: FileText },
-  { label: "Templates", href: "/templates", icon: LayoutTemplate },
-  { label: "Responses", href: "/responses", icon: MessageSquare },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
+const baseItems = [
+  { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
+  { label: "Forms", href: "/forms", icon: IconForms },
+  { label: "Templates", href: "/templates", icon: IconTemplates },
+  { label: "Responses", href: "/responses", icon: IconResponses },
+  { label: "Analytics", href: "/analytics", icon: IconAnalytics },
 ];
 
 export function SidebarNav() {
@@ -22,6 +31,13 @@ export function SidebarNav() {
   const [lastVisited, setLastVisited] = useState<number | null | undefined>(undefined);
   const { data: forms = [] } = trpc.form.listFormsByUser.useQuery();
   const { entries } = useSubmissionsAcrossForms(forms.map(({ id, title }) => ({ id, title })));
+  const { data: roleData } = useUserRole();
+  const isAdmin = roleData?.userRole === "admin";
+
+  const items = isAdmin
+    ? [...baseItems, { label: "Admin", href: "/admin", icon: IconAdmin }]
+    : baseItems;
+
   const hasNewResponses = entries.some(({ submissions }) =>
     submissions.some((submission) => {
       const submittedAt = submission.submittedAt
@@ -50,13 +66,8 @@ export function SidebarNav() {
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-border bg-sidebar md:flex md:flex-col">
-      <div className="flex h-14 items-center gap-2.5 border-b border-border px-5 text-sm font-semibold tracking-tight text-sidebar-foreground">
-        <span className="flex size-6 items-center justify-center rounded-[var(--radius)] bg-foreground font-mono text-[11px] font-bold text-background">
-          F
-        </span>
-        <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
-          FTHEFORM
-        </span>
+      <div className="flex h-14 items-center border-b border-border px-5 text-sm font-semibold tracking-tight text-sidebar-foreground">
+        <Logo size="sm" showWordmark />
       </div>
 
       <nav className="flex-1 space-y-1 p-3">

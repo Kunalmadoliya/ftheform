@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { IconChevronDown, IconChevronUp } from "~/components/icons/app-icons";
 
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   useAnswersForSubmissions,
   useSubmissionsAcrossForms,
@@ -64,63 +65,83 @@ export function ResponsesPage() {
       : `Field ${fieldId}`;
   }
 
+  const isLoading = formsQuery.isPending || responseData.isPending;
+
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Responses from all your forms</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Responses</h1>
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Inbox</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Responses</h1>
+        <p className="mt-1 text-xs text-muted-foreground">Aggregated submissions across all your forms.</p>
       </div>
-      {formsQuery.isPending || responseData.isPending ? (
-        <p className="text-sm text-muted-foreground">Loading responses...</p>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16 w-full rounded-2xl border border-border" />
+          <Skeleton className="h-16 w-full rounded-2xl border border-border" />
+          <Skeleton className="h-16 w-full rounded-2xl border border-border" />
+        </div>
       ) : null}
-      {formsQuery.isError || responseData.isError ? (
-        <p className="text-sm text-destructive" role="alert">Unable to load responses.</p>
-      ) : null}
-      {!formsQuery.isPending && !responseData.isPending && submissions.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          There are no submitted responses yet.
+
+      {(formsQuery.isError || responseData.isError) && !isLoading ? (
+        <p className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 font-mono text-xs text-destructive" role="alert">
+          Unable to load responses.
         </p>
       ) : null}
+
+      {!isLoading && submissions.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+          <p className="font-mono text-xs text-muted-foreground">There are no submitted responses yet.</p>
+        </div>
+      ) : null}
+
       <div className="space-y-3">
         {submissions.map(({ form, submission }) => {
           const isExpanded = expandedId === submission.id;
           return (
-            <Card key={submission.id}>
-              <CardHeader className="flex-row items-center justify-between gap-4">
+            <Card key={submission.id} className="rounded-2xl border-border bg-card shadow-none">
+              <CardHeader className="flex-row items-center justify-between gap-4 p-5">
                 <div>
-                  <CardTitle className="text-base">{form.title}</CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <CardTitle className="text-sm font-semibold text-foreground">{form.title}</CardTitle>
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">
                     Submitted {new Date(submission.submittedAt ?? submission.startedAt).toLocaleString()}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-md p-2 hover:bg-muted"
+                  className="rounded-lg border border-border bg-background p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-expanded={isExpanded}
                   aria-label={isExpanded ? "Collapse answers" : "Expand answers"}
                   onClick={() => setExpandedId(isExpanded ? undefined : submission.id)}
                 >
-                  {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  {isExpanded ? <IconChevronUp className="size-4" /> : <IconChevronDown className="size-4" />}
                 </button>
               </CardHeader>
               {isExpanded ? (
-                <CardContent className="border-t pt-4">
+                <CardContent className="border-t border-border p-5">
                   {answersData.isPending || snapshotQuery.isPending ? (
-                    <p className="text-sm text-muted-foreground">Loading answers...</p>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
                   ) : null}
                   {answersData.isError || snapshotQuery.isError ? (
-                    <p className="text-sm text-destructive" role="alert">Unable to load this response.</p>
+                    <p className="font-mono text-xs text-destructive" role="alert">
+                      Unable to load this response.
+                    </p>
                   ) : null}
                   {!answersData.isPending && answers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No answers were recorded.</p>
+                    <p className="font-mono text-xs text-muted-foreground">No answers were recorded.</p>
                   ) : null}
                   <dl className="grid gap-4 sm:grid-cols-2">
                     {answers.map((answer) => (
-                      <div key={answer.id} className="space-y-1">
-                        <dt className="text-xs font-medium text-muted-foreground">
+                      <div key={answer.id} className="rounded-xl border border-border bg-muted/10 p-3.5 space-y-1">
+                        <dt className="font-mono text-xs text-muted-foreground">
                           {fieldLabel(answer.fieldId, answer.fieldKey)}
                         </dt>
-                        <dd className="break-words text-sm">{displayValue(answer.value)}</dd>
+                        <dd className="break-words font-sans text-sm text-foreground">
+                          {displayValue(answer.value)}
+                        </dd>
                       </div>
                     ))}
                   </dl>

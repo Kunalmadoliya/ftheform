@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import {
-  ArrowLeft,
-  Check,
-  Eye,
-  Globe2,
-  Loader2,
-  Plus,
-  Send,
-  SlidersHorizontal,
-} from "lucide-react";
+  IconBack,
+  IconCheck,
+  IconCreate,
+  IconOpenExternal,
+  IconPreview,
+  IconPublish,
+  IconSliders,
+  IconSpinner,
+} from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -51,7 +51,7 @@ export function BuilderHeader({
       <div className="flex min-w-0 items-center gap-2">
         <Button asChild variant="ghost" size="icon" className="size-8" aria-label="Back to dashboard">
           <Link href="/dashboard">
-            <ArrowLeft className="size-4" />
+            <IconBack className="size-4" />
           </Link>
         </Button>
 
@@ -63,7 +63,7 @@ export function BuilderHeader({
             onClick={onToggleLeftPane}
             aria-label="Open field types and AI"
           >
-            <Plus className="size-4" />
+            <IconCreate className="size-4" />
           </Button>
         ) : null}
 
@@ -78,12 +78,12 @@ export function BuilderHeader({
 
           {isSaving ? (
             <span className="hidden items-center gap-1.5 font-mono text-[11px] text-muted-foreground sm:inline-flex">
-              <Loader2 className="size-3 animate-spin text-foreground" />
+              <IconSpinner className="size-3 animate-spin text-foreground" />
               Saving...
             </span>
           ) : (
             <span className="hidden items-center gap-1.5 font-mono text-[11px] text-muted-foreground sm:inline-flex">
-              <Check className="size-3 text-foreground" />
+              <IconCheck className="size-3 text-foreground" />
               {savedAt ? `Saved ${savedAt}` : "Saved"}
             </span>
           )}
@@ -102,7 +102,7 @@ export function BuilderHeader({
             onClick={onToggleRightPane}
             aria-label="Open inspector and settings"
           >
-            <SlidersHorizontal className="size-4" />
+            <IconSliders className="size-4" />
           </Button>
         ) : null}
 
@@ -112,7 +112,7 @@ export function BuilderHeader({
           onClick={onPreview}
           className="h-8 gap-1.5 text-xs font-normal"
         >
-          <Eye className="size-3.5" />
+          <IconPreview className="size-3.5" />
           <span className="hidden sm:inline">Preview</span>
         </Button>
 
@@ -124,9 +124,9 @@ export function BuilderHeader({
           className="h-8 gap-1.5 text-xs font-normal"
         >
           {isPublishing ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <IconSpinner className="size-3.5 animate-spin" />
           ) : (
-            <Send className="size-3.5" />
+            <IconPublish className="size-3.5" />
           )}
           <span>{isPublishing ? "Publishing..." : isPublished ? "Republish" : "Publish"}</span>
         </Button>
@@ -136,7 +136,7 @@ export function BuilderHeader({
           onClick={onShare}
           className="h-8 gap-1.5 text-xs font-medium"
         >
-          <Globe2 className="size-3.5" />
+          <IconOpenExternal className="size-3.5" />
           <span>Share</span>
         </Button>
       </div>

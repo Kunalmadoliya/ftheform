@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Plus, Sparkles } from "lucide-react";
+import { IconAi, IconCreate, IconForms } from "~/components/icons/app-icons";
 import { FormCard, type FormSummary } from "~/components/dashboard/form-card";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card";
@@ -66,7 +66,7 @@ export function FormsGrid({
     return (
       <div className="flex min-h-80 flex-col items-center justify-center rounded-[var(--radius)] border border-dashed border-border/80 bg-card/40 p-8 text-center">
         <div className="flex size-12 items-center justify-center rounded-[var(--radius)] border border-border bg-muted/60 text-muted-foreground">
-          <FileText className="size-5" />
+          <IconForms className="size-5" />
         </div>
         <h3 className="mt-4 text-sm font-semibold tracking-tight text-foreground">
           No forms in this view
@@ -78,13 +78,13 @@ export function FormsGrid({
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
           {onCreateForm ? (
             <Button size="sm" onClick={onCreateForm}>
-              <Plus className="size-3.5 mr-1.5" />
+              <IconCreate className="size-3.5 mr-1.5" />
               Create form
             </Button>
           ) : null}
           {onCreateAi ? (
             <Button size="sm" variant="outline" onClick={onCreateAi}>
-              <Sparkles className="size-3.5 mr-1.5" />
+              <IconAi className="size-3.5 mr-1.5" />
               Create with AI
             </Button>
           ) : null}

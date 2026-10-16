@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, SlidersHorizontal, Sparkles } from "lucide-react";
+import { IconBack, IconWarning } from "~/components/icons/app-icons";
 import { toast } from "sonner";
 
 import { BuilderHeader } from "~/components/builder/builder-header";
@@ -339,7 +339,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
       <div className="flex min-h-screen items-center justify-center p-6 bg-background">
         <div className="max-w-md w-full rounded-[var(--radius)] border border-destructive/40 bg-card p-6 text-center space-y-4">
           <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <AlertCircle className="size-5" />
+            <IconWarning className="size-5" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">Unable to load form</h2>
@@ -353,7 +353,7 @@ export function BuilderPage({ formId }: BuilderPageProps) {
             onClick={() => router.push("/dashboard")}
             className="w-full text-xs"
           >
-            <ArrowLeft className="size-3.5 mr-1.5" />
+            <IconBack className="size-3.5 mr-1.5" />
             Back to dashboard
           </Button>
         </div>

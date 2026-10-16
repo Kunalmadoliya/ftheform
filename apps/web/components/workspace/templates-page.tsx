@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FilePlus2 } from "lucide-react";
+import { IconCreate } from "~/components/icons/app-icons";
 
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -172,11 +172,12 @@ export function TemplatesPage() {
                   {template.fields.length} fields
                 </p>
                 <Button
-                  className="w-full"
+                  className="w-full text-xs"
+                  size="sm"
                   disabled={Boolean(creatingTemplateId)}
                   onClick={() => void useTemplate(template)}
                 >
-                  <FilePlus2 />
+                  <IconCreate className="size-3.5 mr-1.5" />
                   {isCreating ? "Creating..." : "Use template"}
                 </Button>
               </CardContent>

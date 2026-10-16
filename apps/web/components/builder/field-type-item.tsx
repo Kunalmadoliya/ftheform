@@ -1,6 +1,6 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "~/components/icons/app-icons";
 import { Button } from "~/components/ui/button";
 
 export type FieldTypeDefinition = {

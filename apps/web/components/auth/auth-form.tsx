@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { GitBranch, Loader2, LockKeyhole, Mail, Sparkles } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Logo } from "~/components/brand/logo";
+import { GoogleLogo, GithubLogo } from "~/components/icons/brand-icons";
+import { IconEmail, IconPassword, IconSpinner, IconUser } from "~/components/icons/app-icons";
 import { authClient } from "~/lib/auth-client";
 import { getAuthCallbackUrl, getAuthPageHref, getAuthReturnPath } from "~/lib/auth-redirect";
 import { env } from "~/env";
@@ -94,14 +96,14 @@ export function AuthForm({ mode }: AuthFormProps) {
   if (verificationSent) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground">
-        <section className="w-full max-w-lg rounded-3xl border border-border bg-card p-8 shadow-xl">
-          <p className="text-sm font-medium text-muted-foreground">One more step</p>
-          <h1 className="mt-2 text-3xl font-semibold">Check your email</h1>
+        <section className="w-full max-w-lg rounded-2xl border border-border bg-card p-8">
+          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">One more step</p>
+          <h1 className="mt-2 text-2xl font-semibold">Check your email</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             We sent a verification link to <strong className="text-foreground">{email}</strong>.
             Verify your email to finish creating your account.
           </p>
-          <Link className="mt-6 inline-block font-medium underline underline-offset-4" href={getAuthPageHref("/login", nextPath)}>
+          <Link className="mt-6 inline-block font-mono text-xs underline underline-offset-4 hover:text-foreground" href={getAuthPageHref("/login", nextPath)}>
             Return to sign in
           </Link>
         </section>
@@ -110,52 +112,69 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-6 py-12 text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,color-mix(in_oklab,var(--primary)_13%,transparent),transparent_34%),radial-gradient(circle_at_85%_90%,color-mix(in_oklab,var(--chart-2)_13%,transparent),transparent_32%)]" />
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl lg:grid-cols-[0.9fr_1.1fr]">
-        <section className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
-          <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-[0.18em]">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary-foreground text-primary">
-              <Sparkles className="size-4" />
-            </span>
-            FTHEFORM
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 text-foreground">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="hidden flex-col justify-between border-r border-border bg-muted/20 p-10 lg:flex">
+          <Link href="/" className="inline-flex">
+            <Logo size="md" showWordmark />
           </Link>
           <div>
-            <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] opacity-70">Make room for better ideas</p>
-            <h1 className="max-w-sm text-4xl font-semibold leading-tight">Turn a blank page into a clear next step.</h1>
-            <p className="mt-5 max-w-sm text-sm leading-6 opacity-75">
-              Build focused forms, gather thoughtful responses, and keep your work moving without the clutter.
+            <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              {isSignUp ? "Create account" : "Authentication"}
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+              {isSignUp ? "Start building forms in seconds." : "Welcome back to your workspace."}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Focused forms, fast collection, and clean responses without clutter.
             </p>
           </div>
-          <p className="text-xs opacity-60">Simple tools for meaningful input.</p>
+          <p className="text-xs font-mono text-muted-foreground">© 2026 FTHEFORM</p>
         </section>
 
-        <section className="p-7 sm:p-12">
+        <section className="p-8 sm:p-12">
           <div className="mb-8 lg:hidden">
-            <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-[0.18em]">
-              <Sparkles className="size-4" />
-              FTHEFORM
+            <Link href="/" className="inline-flex">
+              <Logo size="sm" showWordmark />
             </Link>
           </div>
           <div className="max-w-md">
-            <p className="text-sm font-medium text-muted-foreground">{isSignUp ? "Get started" : "Welcome back"}</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight">{isSignUp ? "Create your account" : "Sign in to your workspace"}</h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              {isSignUp ? "Get started" : "Welcome back"}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+              {isSignUp ? "Create your account" : "Sign in to your workspace"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {isSignUp ? "Your next great form starts here." : "Pick up where you left off."}
             </p>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Button type="button" variant="outline" className="h-11" disabled={isPending} onClick={() => handleSocialAuth("google")}>
-                <span className="font-semibold">G</span>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 font-mono text-xs"
+                disabled={isPending}
+                onClick={() => handleSocialAuth("google")}
+                aria-label="Sign in with Google"
+              >
+                <GoogleLogo className="size-4 shrink-0" />
                 Google
               </Button>
-              <Button type="button" variant="outline" className="h-11" disabled={isPending} onClick={() => handleSocialAuth("github")}>
-                <GitBranch className="size-4" />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 font-mono text-xs"
+                disabled={isPending}
+                onClick={() => handleSocialAuth("github")}
+                aria-label="Sign in with GitHub"
+              >
+                <GithubLogo className="size-4 shrink-0" />
                 GitHub
               </Button>
             </div>
 
-            <div className="my-7 flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="my-6 flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <div className="h-px flex-1 bg-border" />
               <span>or continue with email</span>
               <div className="h-px flex-1 bg-border" />
@@ -164,35 +183,68 @@ export function AuthForm({ mode }: AuthFormProps) {
             <form className="space-y-4" onSubmit={handleEmailAuth}>
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} required />
+                  <Label htmlFor="name" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                    Name
+                  </Label>
+                  <div className="relative">
+                    <IconUser className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      autoComplete="name"
+                      className="pl-9 font-sans"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Email
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="email" type="email" autoComplete="email" className="pl-9" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                  <IconEmail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    className="pl-9 font-sans"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                  />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Password
+                </Label>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="password" type="password" autoComplete={isSignUp ? "new-password" : "current-password"} className="pl-9" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+                  <IconPassword className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete={isSignUp ? "new-password" : "current-password"}
+                    className="pl-9 font-sans"
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
                 </div>
               </div>
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-              <Button type="submit" className="h-11 w-full" disabled={isPending}>
-                {isPending && <Loader2 className="size-4 animate-spin" />}
+              <Button type="submit" className="h-10 w-full gap-2 font-medium" disabled={isPending}>
+                {isPending && <IconSpinner className="size-4 animate-spin" />}
                 {isSignUp ? "Create account" : "Sign in"}
               </Button>
             </form>
 
-            <p className="mt-7 text-center text-sm text-muted-foreground">
+            <p className="mt-6 text-center text-sm text-muted-foreground">
               {isSignUp ? "Already have an account?" : "New to FTHEFORM?"}{" "}
               <Link
-                className="font-medium text-foreground underline underline-offset-4"
+                className="font-medium text-foreground underline underline-offset-4 hover:opacity-80"
                 href={getAuthPageHref(isSignUp ? "/login" : "/sign-up", nextPath)}
               >
                 {isSignUp ? "Log in" : "Create an account"}

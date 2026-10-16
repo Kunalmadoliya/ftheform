@@ -1,7 +1,16 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  IconAi,
+  IconArrowDown,
+  IconArrowUp,
+  IconCreate,
+  IconDelete,
+  IconEdit,
+  IconGrip,
+  fieldTypeIcons,
+} from "~/components/icons/app-icons";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { Button } from "~/components/ui/button";
@@ -120,7 +129,7 @@ export function FormCanvas({
           {fields.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center rounded-[var(--radius)] border border-dashed border-border bg-card/40 p-8 text-center">
               <div className="flex size-10 items-center justify-center rounded-md border border-border bg-muted/60 text-muted-foreground">
-                <Plus className="size-5" />
+                <IconCreate className="size-5" />
               </div>
               <h3 className="mt-3 text-sm font-semibold tracking-tight text-foreground">
                 Your form is empty
@@ -131,11 +140,11 @@ export function FormCanvas({
               </p>
               <div className="mt-5 flex items-center gap-2">
                 <Button size="sm" onClick={onAdd} className="h-8 gap-1.5 text-xs">
-                  <Plus className="size-3.5" />
+                  <IconCreate className="size-3.5" />
                   Add a field
                 </Button>
                 <div className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                  <Sparkles className="size-3 text-foreground" />
+                  <IconAi className="size-3 text-foreground" />
                   <span>or prompt AI below</span>
                 </div>
               </div>
@@ -185,12 +194,18 @@ export function FormCanvas({
                         }
                       }}
                     >
-                      <GripVertical className="size-4" />
+                      <IconGrip className="size-4" />
                     </span>
 
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium text-foreground">
-                        {field.label}
+                      <span className="flex items-center gap-1.5 truncate text-xs font-medium text-foreground">
+                        {(() => {
+                          const FieldIcon = fieldTypeIcons[field.type];
+                          return FieldIcon ? (
+                            <FieldIcon className="size-3.5 text-muted-foreground shrink-0" />
+                          ) : null;
+                        })()}
+                        <span className="truncate">{field.label}</span>
                       </span>
                       <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
                         {field.type}
@@ -211,7 +226,7 @@ export function FormCanvas({
                         }}
                         aria-label={`Move ${field.label} up`}
                       >
-                        <ArrowUp className="size-3.5" />
+                        <IconArrowUp className="size-3.5" />
                       </Button>
                       <Button
                         type="button"
@@ -225,7 +240,7 @@ export function FormCanvas({
                         }}
                         aria-label={`Move ${field.label} down`}
                       >
-                        <ArrowDown className="size-3.5" />
+                        <IconArrowDown className="size-3.5" />
                       </Button>
                       <Button
                         type="button"
@@ -238,7 +253,7 @@ export function FormCanvas({
                         }}
                         aria-label={`Edit ${field.label}`}
                       >
-                        <Pencil className="size-3.5" />
+                        <IconEdit className="size-3.5" />
                       </Button>
                       <Button
                         type="button"
@@ -251,7 +266,7 @@ export function FormCanvas({
                         }}
                         aria-label={`Delete ${field.label}`}
                       >
-                        <Trash2 className="size-3.5" />
+                        <IconDelete className="size-3.5" />
                       </Button>
                     </span>
                   </CardContent>
@@ -268,7 +283,7 @@ export function FormCanvas({
             className="mt-4 w-full h-9 border-dashed border-border/80 text-xs font-normal"
             onClick={onAdd}
           >
-            <Plus className="size-3.5 mr-1.5" />
+            <IconCreate className="size-3.5 mr-1.5" />
             Add field
           </Button>
         ) : null}
