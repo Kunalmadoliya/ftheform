@@ -230,6 +230,9 @@ importers:
       inngest:
         specifier: ^4.23.0
         version: 4.23.0(@opentelemetry/core@2.12.0(@opentelemetry/api@1.9.1))(express@5.2.1(supports-color@7.2.0))(h3@1.15.11)(hono@4.13.8)(next@16.3.5(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(typescript@5.9.3)(zod@4.6.5)
+      tldts:
+        specifier: ^7.4.18
+        version: 7.4.18
       trpc-to-openapi:
         specifier: ^3.3.0
         version: 3.3.0(@trpc/server@11.18.0(typescript@5.9.3))(zod-openapi@5.4.6(zod@4.6.5))(zod@4.6.5)

@@ -82,8 +82,11 @@ export async function createContext({
     }
     const issuedAt = Math.floor(Date.now() / 1000);
     const value = `v1.${id}.${issuedAt}.${respondentSignature(id, issuedAt)}`;
-    const isProduction = env.NODE_ENV === "production";
-    const cookie = `${respondentCookieName}=${value}; Max-Age=${respondentCookieMaxAge}; Path=/; HttpOnly; SameSite=${isProduction ? "None" : "Lax"}${isProduction ? "; Secure" : ""}`;
+    // Always use SameSite=Lax: requires the web app and API to share the same
+    // registrable domain. The Secure flag is derived from BASE_URL's protocol,
+    // not from NODE_ENV, so it works correctly in any HTTPS environment.
+    const secureCookie = new URL(env.BASE_URL).protocol === "https:";
+    const cookie = `${respondentCookieName}=${value}; Max-Age=${respondentCookieMaxAge}; Path=/; HttpOnly; SameSite=Lax${secureCookie ? "; Secure" : ""}`;
     const existing = res.getHeader("Set-Cookie");
     res.setHeader("Set-Cookie", existing
       ? [...(Array.isArray(existing) ? existing : [String(existing)]), cookie]

@@ -7,11 +7,33 @@ import * as schema from "../auth-schema";
 
 import { db } from "../index";
 
-const isProduction = env.NODE_ENV === "production";
+// Build the list of trusted origins from WEB_URL and the optional TRUSTED_ORIGINS env var.
+// TRUSTED_ORIGINS is a comma-separated list validated and normalised by env.ts.
+function buildTrustedOrigins(): string[] {
+  const extra = (process.env.TRUSTED_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !s.includes("*"))
+    .map((s) => {
+      try {
+        return new URL(s).origin;
+      } catch {
+        return null;
+      }
+    })
+    .filter((s): s is string => s !== null);
+  const set = new Set([env.WEB_URL, ...extra]);
+  return Array.from(set);
+}
+
+// Derive the Secure cookie flag from the BASE_URL protocol, not from NODE_ENV.
+// This works correctly when HTTPS is used in development (e.g. behind a local reverse proxy)
+// and avoids hardcoding environment names in security-critical cookie attributes.
+const secureCookie = new URL(env.BASE_URL).protocol === "https:";
 
 export const auth = betterAuth({
   baseURL: env.BASE_URL,
-  trustedOrigins: [env.WEB_URL],
+  trustedOrigins: buildTrustedOrigins(),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -82,8 +104,13 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: "ftheform",
     defaultCookieAttributes: {
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
+      // Always use SameSite=Lax: requires that the web app and API share the same
+      // registrable domain (e.g. example.com and api.example.com). Cross-site
+      // (SameSite=None) cookies are intentionally not supported; see README.
+      sameSite: "lax",
+      // Secure is derived from BASE_URL's protocol so it works correctly
+      // whether HTTPS is used in development, staging, or production.
+      secure: secureCookie,
       httpOnly: true,
     },
   },

@@ -33,9 +33,7 @@ pnpm install
 
 Copy `.env.example` to `.env` and set `DATABASE_URL` for the host database. `NODE_ENV`, `PORT`, `BASE_URL`, `WEB_URL`, `BETTER_AUTH_SECRET`, and `DATABASE_URL` are validated before the API starts. The API also needs provider credentials and, for email verification, `RESEND_API_KEY` and `EMAIL_FROM`. The web requires `NEXT_PUBLIC_WEB_URL` and `NEXT_PUBLIC_API_URL` at build time.
 
-The API allows browser requests only from `WEB_URL`; Better Auth uses the same origin as its trusted origin. In production both URLs must use HTTPS and must not point to localhost.
-
-Set `RESPONDENT_COOKIE_SECRET` to a separate random value of at least 32 characters; it signs respondent identity cookies and must be shared by every API instance. Prefer hosting the web app and API under the same site (for example, `forms.example.com` and `api.example.com`): the respondent cookie can then use `SameSite=Lax`. When the web and API are on different sites, production uses `SameSite=None; Secure`, which requires HTTPS and may be restricted by browser third-party-cookie policies.
+All URLs come exclusively from environment variables — no URL, domain, hostname, or port is hardcoded in source code. Set them correctly for each environment; the guidance below uses generic placeholders.
 
 After configuring `.env`, start only the local database and apply migrations:
 
@@ -73,7 +71,7 @@ npx inngest-cli@latest dev -u "$BASE_URL/api/inngest"
 pnpm --filter web dev
 ```
 
-In production, configure `OPENAI_API_KEY` and `OPENAI_MODEL` for the API. For Inngest Cloud, also configure `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`; register the API endpoint at `https://<public-api-host>/api/inngest`. Do not set `INNGEST_DEV` in production. The included Compose setup passes these values only to the API service. Missing AI credentials do not prevent unrelated API routes from starting, but generation will fail with an actionable status until the relevant service is configured.
+In production, configure `OPENAI_API_KEY` and `OPENAI_MODEL` for the API. For Inngest Cloud, also configure `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`; register the API endpoint at `https://<api-host>/api/inngest`. Do not set `INNGEST_DEV` in production. The included Compose setup passes these values only to the API service. Missing AI credentials do not prevent unrelated API routes from starting, but generation will fail with an actionable status until the relevant service is configured.
 
 From a form builder, enter a description of the fields to generate in the right sidebar and choose **Generate fields**. Generated fields are validated against supported form field definitions and appended after the existing fields in a single transaction. They appear in the builder when the background job completes. If the form is already published, use **Republish** to create a new live snapshot; existing submissions remain tied to their original snapshot.
 
@@ -85,34 +83,80 @@ Useful root commands are `pnpm dev`, `pnpm build`, `pnpm check-types`, `pnpm lin
 
 The browser uses the typed TRPC client in `apps/web/trpc`. Requests go to the API's `/trpc` endpoint. The API builds an auth-aware context from Better Auth cookies, protected procedures verify the session, and services enforce form ownership using the authenticated user ID. Publishing a form creates a versioned snapshot; public form submissions are tied to that snapshot and their answers are persisted separately from the in-progress draft. Form owners can review submitted responses and their answers from the form's Responses page.
 
-The API also serves `/health`, `/openapi.json`, `/docs`, `/api/auth/*`, and the OpenAPI-backed `/api/*` procedures.
+The API also serves `/health`, `/openapi.json`, `/docs`, `/api/auth/*`, and OpenAPI-documented procedures via the `/api` prefix. Note that only procedures explicitly marked with an `openapi` metadata block are exposed as REST endpoints through the OpenAPI adapter; other tRPC procedures are accessible only via the `/trpc` endpoint.
+
+## Cookie and CSRF Security
+
+All authentication cookies (Better Auth) and the respondent identity cookie use **`SameSite=Lax`** in every environment. The `Secure` attribute is set automatically when `BASE_URL` uses `https:` — it is not tied to `NODE_ENV`.
+
+**Same-registrable-domain requirement:** `SameSite=Lax` cookies are sent by the browser only when the initiating page and the target share the same *registrable domain* (the domain + its public-suffix, e.g. `example.com`). Therefore:
+
+- The web app (`WEB_URL`) and the API (`BASE_URL`) **must share the same registrable domain**.
+  - ✅ `https://forms.example.com` + `https://api.example.com` — same domain `example.com` — works.
+  - ❌ `https://forms.example.com` + `https://my-api.render.com` — different domains — cookies will be blocked.
+- The API logs a loud warning at startup if the domains differ.
+
+`SameSite=None` (cross-site) cookies are intentionally not supported.
+
+For CSRF protection, every state-changing request (`POST`, `PUT`, `PATCH`, `DELETE`) on `/trpc` and `/api` must carry an `Origin` header (or `Referer` as fallback) matching a trusted origin. Requests that fail this check receive `403`. Inngest webhook callbacks and OAuth redirect callbacks are exempt.
+
+Trusted origins are built from `WEB_URL` and the optional `TRUSTED_ORIGINS` environment variable (comma-separated list of full HTTPS origins, no wildcards). Set `TRUSTED_ORIGINS` if you run preview or staging deployments that need to access the same API.
 
 ## Deploying
 
-Deploy `apps/web` to Vercel and `apps/api` to Render, building both from the repository root with `pnpm --filter web build` and `pnpm --filter @repo/api build`. Set the web build environment variables in Vercel:
+> **Same-domain rule:** The web app and API must share the same registrable domain. Choose a domain you control and create DNS records for both the web app and the API before configuring your hosts.
 
-- `NEXT_PUBLIC_WEB_URL=https://ftheform.vercel.app`
-- `NEXT_PUBLIC_API_URL=https://<RENDER_API_URL>/trpc`
+Deploy `apps/web` to your preferred static/Node.js host and `apps/api` to a Node.js service host, building both from the repository root with `pnpm --filter web build` and `pnpm --filter @repo/api build`.
 
-Create a PostgreSQL database in Neon and copy its connection string from the Neon dashboard. Keep Neon’s required TLS option (usually `sslmode=require`) in that value. Set the string as `DATABASE_URL` in both Render and any environment used to run production migrations. Do not commit it or put it in a `NEXT_PUBLIC_*` variable.
+In all examples below, replace `<web-domain>` with your registrable domain (e.g. `example.com`) and choose subdomains that point to the correct services.
 
-Set these API environment variables in Render (Render provides `PORT`; `DATABASE_URL` is the Neon connection string):
+### Development example values
+
+```
+# Development: both services run on localhost — cookies work without HTTPS.
+NODE_ENV=development
+WEB_URL=http://localhost:3000
+BASE_URL=http://localhost:4000
+NEXT_PUBLIC_WEB_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:4000/trpc
+```
+
+### Production example values
+
+```
+# Production: both services use HTTPS and share the same registrable domain.
+NODE_ENV=production
+WEB_URL=https://<web-domain>
+BASE_URL=https://api.<web-domain>
+NEXT_PUBLIC_WEB_URL=https://<web-domain>
+NEXT_PUBLIC_API_URL=https://api.<web-domain>/trpc
+```
+
+Set the **web build-time** environment variables in your hosting provider's build settings:
+
+- `NEXT_PUBLIC_WEB_URL=https://<web-domain>`
+- `NEXT_PUBLIC_API_URL=https://api.<web-domain>/trpc`
+
+Create a PostgreSQL database in your preferred provider (e.g. Neon) and copy its connection string. Keep any required TLS option (e.g. `sslmode=require`) in that value. Set the string as `DATABASE_URL` in both your API service and any environment used to run production migrations. Do not commit it or put it in a `NEXT_PUBLIC_*` variable.
+
+Set these **API** environment variables in your hosting provider (the host provides `PORT`; `DATABASE_URL` is the production PostgreSQL connection string):
 
 - `NODE_ENV=production`
-- `PORT` (provided by Render)
-- `BASE_URL=https://<RENDER_API_URL>`
-- `WEB_URL=https://ftheform.vercel.app`
+- `PORT` (provided by host)
+- `BASE_URL=https://api.<web-domain>`
+- `WEB_URL=https://<web-domain>`
 - `DATABASE_URL` (the production PostgreSQL connection string)
 - `BETTER_AUTH_SECRET` and `RESPONDENT_COOKIE_SECRET` (separate random values of at least 32 characters)
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`
 - `RESEND_API_KEY` and `EMAIL_FROM` for verification email delivery
+- `TRUSTED_ORIGINS` (optional; comma-separated additional trusted origins for preview/staging deployments)
 
-Register these OAuth callback URLs with the providers:
+Register these **OAuth callback URLs** with the providers — they must use the API's public URL (`BASE_URL`), not the web URL:
 
-- `https://<RENDER_API_URL>/api/auth/callback/google`
-- `https://<RENDER_API_URL>/api/auth/callback/github`
+- `https://api.<web-domain>/api/auth/callback/google`
+- `https://api.<web-domain>/api/auth/callback/github`
 
-For local development, set `DATABASE_URL` in the root `.env` to the host PostgreSQL URL (normally `localhost:5432`). For production, Render should use `DATABASE_URL` directly. To explicitly run a migration against Neon from PowerShell, set `$env:DATABASE_URL` to the Neon connection string in that shell before `pnpm db:migrate`.
+For local development, set `DATABASE_URL` in the root `.env` to the host PostgreSQL URL (normally `localhost:5432`). To explicitly run a migration against a remote database from PowerShell, set `$env:DATABASE_URL` to the remote connection string in that shell before `pnpm db:migrate`.
 
 The API rejects production configuration unless both public origins use HTTPS and neither points to localhost. Apply database migrations before serving traffic. The included Compose setup starts PostgreSQL, runs migrations against the configured `POSTGRES_DB`, and then starts the API and web app on ports 4000 and 3000.
 
