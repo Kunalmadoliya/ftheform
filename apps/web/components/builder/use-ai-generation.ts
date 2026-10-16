@@ -19,8 +19,14 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
   const [pollingTimedOut, setPollingTimedOut] = useState<boolean>(false);
   const completedJobId = useRef<string | undefined>(undefined);
   const failedJobId = useRef<string | undefined>(undefined);
+  const timedOutJobId = useRef<string | undefined>(undefined);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const utils = trpc.useUtils();
+
+  const callbacksRef = useRef({ onCompleted, onFailed, onTimedOut });
+  useEffect(() => {
+    callbacksRef.current = { onCompleted, onFailed, onTimedOut };
+  });
 
   // Keep internal formId in sync if initialFormId changes
   useEffect(() => {
@@ -34,6 +40,7 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
     return () => {
       if (timeoutTimerRef.current) {
         clearTimeout(timeoutTimerRef.current);
+        timeoutTimerRef.current = undefined;
       }
     };
   }, []);
@@ -68,8 +75,8 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
       void utils.formField.listFormFields.invalidate({ formId });
       void utils.form.getFormById.invalidate({ formId });
     }
-    onCompleted?.(jobId);
-  }, [formId, jobId, onCompleted, status, utils]);
+    callbacksRef.current.onCompleted?.(jobId);
+  }, [formId, jobId, status, utils]);
 
   // Trigger callback on failure
   useEffect(() => {
@@ -79,14 +86,19 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
       timeoutTimerRef.current = undefined;
     }
     failedJobId.current = jobId;
-    onFailed?.(statusQuery.data?.error);
-  }, [jobId, onFailed, status, statusQuery.data?.error]);
+    callbacksRef.current.onFailed?.(statusQuery.data?.error);
+  }, [jobId, status, statusQuery.data?.error]);
 
   // Trigger callback on polling timeout
   useEffect(() => {
-    if (!pollingTimedOut) return;
-    onTimedOut?.();
-  }, [onTimedOut, pollingTimedOut]);
+    if (!pollingTimedOut || !jobId || timedOutJobId.current === jobId) return;
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = undefined;
+    }
+    timedOutJobId.current = jobId;
+    callbacksRef.current.onTimedOut?.();
+  }, [jobId, pollingTimedOut]);
 
   async function startGeneration({
     formId: targetFormId,
@@ -100,9 +112,11 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
     setFormId(targetFormId);
     completedJobId.current = undefined;
     failedJobId.current = undefined;
+    timedOutJobId.current = undefined;
 
     if (timeoutTimerRef.current) {
       clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = undefined;
     }
     // 10-minute timeout
     timeoutTimerRef.current = setTimeout(() => {
@@ -137,6 +151,7 @@ export function useAiGeneration(options: UseAiGenerationOptions = {}) {
     setPollingTimedOut(false);
     completedJobId.current = undefined;
     failedJobId.current = undefined;
+    timedOutJobId.current = undefined;
   }
 
   return {

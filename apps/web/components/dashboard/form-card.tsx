@@ -210,7 +210,7 @@ export function FormCard({
                 size="icon"
                 className="size-8 shrink-0"
                 disabled
-                aria-label="Public form unavailable"
+                aria-label="Open public form"
               >
                 <ExternalLink className="size-3.5" />
               </Button>
