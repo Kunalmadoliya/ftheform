@@ -236,21 +236,22 @@ export default function PublicFormPage() {
   const hasRestoredStepRef = useRef(false);
   useEffect(() => {
     if (!submissionId || hasRestoredStepRef.current || fields.length === 0) return;
-    const hasAnyDraftAnswer = Object.keys(answers).length > 0;
-    if (!hasAnyDraftAnswer) return;
-
     hasRestoredStepRef.current = true;
-    const firstUnansweredIndex = fields.findIndex((field) => {
-      if (!field.required) return false;
-      return validateField(field, answers[field.id]) !== null;
-    });
 
-    if (firstUnansweredIndex !== -1) {
-      setCurrentStep(firstUnansweredIndex + 1);
-    } else {
-      setCurrentStep(1);
+    const hasAnyDraftAnswer = Object.keys(answers).length > 0;
+    if (currentStep === 0 && hasAnyDraftAnswer) {
+      const firstUnansweredIndex = fields.findIndex((field) => {
+        if (!field.required) return false;
+        return validateField(field, answers[field.id]) !== null;
+      });
+
+      if (firstUnansweredIndex !== -1) {
+        setCurrentStep(firstUnansweredIndex + 1);
+      } else {
+        setCurrentStep(1);
+      }
     }
-  }, [answers, fields, submissionId]);
+  }, [answers, currentStep, fields, submissionId]);
 
   async function handleSubmit(event?: FormEvent<HTMLFormElement>) {
     if (event) event.preventDefault();
@@ -294,6 +295,9 @@ export default function PublicFormPage() {
     }
   }
 
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
   const handleNextOrSubmit = useCallback(() => {
     if (currentStep === 0) {
       if (fields.length === 0) return;
@@ -302,14 +306,29 @@ export default function PublicFormPage() {
       return;
     }
 
+    const isLastStep = currentStep === fields.length && currentStep > 0;
+    if (isLastStep) {
+      if (
+        form?.isOwner ||
+        isSubmitting ||
+        isSavingDraft ||
+        versionQuery.data?.mismatch ||
+        !submissionId
+      ) {
+        return;
+      }
+    }
+
     const currentFieldIndex = currentStep - 1;
     const currentField = fields[currentFieldIndex];
     if (!currentField) return;
 
-    const error = validateField(currentField, answers[currentField.id]);
-    if (error) {
-      setFieldErrors((prev) => ({ ...prev, [currentField.id]: error }));
-      return;
+    if (!form?.isOwner) {
+      const error = validateField(currentField, answers[currentField.id]);
+      if (error) {
+        setFieldErrors((prev) => ({ ...prev, [currentField.id]: error }));
+        return;
+      }
     }
 
     setFieldErrors((prev) => ({ ...prev, [currentField.id]: null }));
@@ -318,9 +337,18 @@ export default function PublicFormPage() {
       setStepDirection("forward");
       setCurrentStep((prev) => prev + 1);
     } else {
-      void handleSubmit();
+      void handleSubmitRef.current();
     }
-  }, [answers, currentStep, fields]);
+  }, [
+    answers,
+    currentStep,
+    fields,
+    form?.isOwner,
+    isSavingDraft,
+    isSubmitting,
+    submissionId,
+    versionQuery.data?.mismatch,
+  ]);
 
   const handlePrevStep = useCallback(() => {
     if (currentStep <= 0) return;
@@ -345,15 +373,28 @@ export default function PublicFormPage() {
       }
 
       if (event.key === "Enter") {
+        const tagName = target?.tagName;
+        const role = target?.getAttribute("role");
+
+        // When the event target is a BUTTON (that isn't a radio/checkbox), A, SUMMARY or has role="button",
+        // do NOT handle Enter and do NOT call preventDefault() (let native activation happen, so Back works).
+        const isButton =
+          (tagName === "BUTTON" && role !== "radio" && role !== "checkbox") ||
+          role === "button";
+        if (isButton || tagName === "A" || tagName === "SUMMARY") {
+          return;
+        }
+
         if (isTextarea) {
           if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
             handleNextOrSubmit();
           }
-        } else {
-          event.preventDefault();
-          handleNextOrSubmit();
+          return;
         }
+
+        event.preventDefault();
+        handleNextOrSubmit();
       }
     }
 
