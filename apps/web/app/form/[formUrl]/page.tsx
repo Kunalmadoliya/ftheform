@@ -2,26 +2,34 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import { StarRating } from "~/components/forms/star-rating";
 import { usePublicForm } from "~/hooks/form/use-public-form";
 import { useSubmission } from "~/hooks/form/use-submission";
 import { toast } from "sonner";
 import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 import { authClient } from "~/lib/auth-client";
 import { env } from "~/env";
+import { Button } from "~/components/ui/button";
 
-type FormField = {
-  id: string;
-  type: string;
-  label: string;
-  required: boolean;
-  config?: unknown;
-};
+import {
+  QuestionScreen,
+  IntroScreen,
+  type FormField,
+  getOptions,
+} from "~/components/public-form/question-screen";
+import { ProgressLine } from "~/components/public-form/progress-line";
+import { NavigationControls } from "~/components/public-form/navigation-controls";
+import {
+  FormNotFoundScreen,
+  LoadingScreen,
+  SignInRequiredScreen,
+  AnonymousOnlyScreen,
+  FormClosedScreen,
+  SnapshotUnavailableScreen,
+  SubmissionCompleteScreen,
+  OwnerPreviewBanner,
+  RestartVersionDialog,
+} from "~/components/public-form/status-screens";
 
 function getFormId(formUrl: string) {
   const match = formUrl.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-/i);
@@ -37,10 +45,60 @@ function getFields(value: unknown): FormField[] {
   });
 }
 
-function getOptions(config: unknown) {
-  if (!config || typeof config !== "object" || Array.isArray(config)) return [];
-  const options = (config as { options?: unknown }).options;
-  return Array.isArray(options) ? options.filter((option): option is string => typeof option === "string") : [];
+function validateField(field: FormField, value: unknown): string | null {
+  const options = getOptions(field.config);
+  const rawConfig = field.config && typeof field.config === "object" && !Array.isArray(field.config)
+    ? (field.config as Record<string, unknown>)
+    : {};
+
+  if (field.required) {
+    if (field.type === "checkbox") {
+      if (value !== true) return "This field is required";
+    } else if (field.type === "rating") {
+      if (typeof value !== "number" || value < 1) return "Please select a rating";
+    } else if (field.type === "number") {
+      if (typeof value !== "number" || isNaN(value)) return "This field is required";
+    } else if (field.type === "multiselect") {
+      if (!Array.isArray(value) || value.length === 0) return "Please select at least one option";
+    } else if (field.type === "select") {
+      if (typeof value !== "string" || value.trim() === "") return "Please select an option";
+    } else {
+      if (typeof value !== "string" || value.trim() === "") return "This field is required";
+    }
+  }
+
+  if (value != null && value !== "") {
+    if (field.type === "email" && typeof value === "string" && value.trim() !== "") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value.trim())) {
+        return "Please enter a valid email address";
+      }
+    } else if (field.type === "number" && typeof value === "number" && !isNaN(value)) {
+      if (typeof rawConfig.min === "number" && value < rawConfig.min) {
+        return `Value must be at least ${rawConfig.min}`;
+      }
+      if (typeof rawConfig.max === "number" && value > rawConfig.max) {
+        return `Value must be at most ${rawConfig.max}`;
+      }
+    } else if (field.type === "date" && typeof value === "string" && value.trim() !== "") {
+      if (typeof rawConfig.minDate === "string" && value < rawConfig.minDate) {
+        return `Date must be on or after ${rawConfig.minDate}`;
+      }
+      if (typeof rawConfig.maxDate === "string" && value > rawConfig.maxDate) {
+        return `Date must be on or before ${rawConfig.maxDate}`;
+      }
+    } else if (field.type === "select" && typeof value === "string" && value.trim() !== "") {
+      if (options.length > 0 && !options.includes(value)) {
+        return "Selected option is invalid";
+      }
+    } else if (field.type === "multiselect" && Array.isArray(value) && value.length > 0) {
+      if (options.length > 0 && value.some((v) => typeof v !== "string" || !options.includes(v))) {
+        return "Selected options contain invalid choices";
+      }
+    }
+  }
+
+  return null;
 }
 
 export default function PublicFormPage() {
@@ -163,15 +221,53 @@ export default function PublicFormPage() {
   }
 
   function restartAfterVersionChange() {
-    if (!window.confirm("This form changed. Discard your saved draft and start a new response?")) return;
     setSubmissionId(undefined);
     setAnswers({});
     setInteractionError("");
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // Stepper and validation state
+  const [currentStep, setCurrentStep] = useState(0);
+  const [stepDirection, setStepDirection] = useState<"forward" | "backward">("forward");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
+
+  // When a saved draft is restored, start at the first unanswered required question, or at the first question if none
+  const hasRestoredStepRef = useRef(false);
+  useEffect(() => {
+    if (!submissionId || hasRestoredStepRef.current || fields.length === 0) return;
+    const hasAnyDraftAnswer = Object.keys(answers).length > 0;
+    if (!hasAnyDraftAnswer) return;
+
+    hasRestoredStepRef.current = true;
+    const firstUnansweredIndex = fields.findIndex((field) => {
+      if (!field.required) return false;
+      return validateField(field, answers[field.id]) !== null;
+    });
+
+    if (firstUnansweredIndex !== -1) {
+      setCurrentStep(firstUnansweredIndex + 1);
+    } else {
+      setCurrentStep(1);
+    }
+  }, [answers, fields, submissionId]);
+
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>) {
+    if (event) event.preventDefault();
     if (!submissionId) return;
+
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i]!;
+      const err = validateField(field, answers[field.id]);
+      if (err) {
+        setFieldErrors((prev) => ({ ...prev, [field.id]: err }));
+        setStepDirection("forward");
+        setCurrentStep(i + 1);
+        setInteractionError(err);
+        return;
+      }
+    }
+
     const missingRating = fields.some(
       (field) => {
         const value = answers[field.id];
@@ -198,124 +294,196 @@ export default function PublicFormPage() {
     }
   }
 
-  if (!formId) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
-  if (formQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
+  const handleNextOrSubmit = useCallback(() => {
+    if (currentStep === 0) {
+      if (fields.length === 0) return;
+      setStepDirection("forward");
+      setCurrentStep(1);
+      return;
+    }
+
+    const currentFieldIndex = currentStep - 1;
+    const currentField = fields[currentFieldIndex];
+    if (!currentField) return;
+
+    const error = validateField(currentField, answers[currentField.id]);
+    if (error) {
+      setFieldErrors((prev) => ({ ...prev, [currentField.id]: error }));
+      return;
+    }
+
+    setFieldErrors((prev) => ({ ...prev, [currentField.id]: null }));
+
+    if (currentStep < fields.length) {
+      setStepDirection("forward");
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      void handleSubmit();
+    }
+  }, [answers, currentStep, fields]);
+
+  const handlePrevStep = useCallback(() => {
+    if (currentStep <= 0) return;
+    setStepDirection("backward");
+    setCurrentStep((prev) => prev - 1);
+  }, [currentStep]);
+
+  // Global keyboard navigation
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (restartDialogOpen) return;
+      const target = event.target as HTMLElement | null;
+      const isInput = target?.tagName === "INPUT";
+      const isTextarea = target?.tagName === "TEXTAREA";
+
+      if (event.key === "ArrowUp") {
+        if (!isInput && !isTextarea && currentStep > 0) {
+          event.preventDefault();
+          handlePrevStep();
+        }
+        return;
+      }
+
+      if (event.key === "Enter") {
+        if (isTextarea) {
+          if (event.metaKey || event.ctrlKey) {
+            event.preventDefault();
+            handleNextOrSubmit();
+          }
+        } else {
+          event.preventDefault();
+          handleNextOrSubmit();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentStep, handleNextOrSubmit, handlePrevStep, restartDialogOpen]);
+
+  if (!formId) return <FormNotFoundScreen />;
+  if (formQuery.isPending) return <LoadingScreen />;
   if (formQuery.error?.data?.code === "UNAUTHORIZED") {
-    const returnTo = `/form/${encodeURIComponent(formUrl)}`;
-    return (
-      <main className="mx-auto max-w-2xl p-8">
-        <h1 className="text-xl font-semibold">Sign in to respond</h1>
-        <p className="mt-2 text-muted-foreground">This form requires an authenticated account.</p>
-        <Link className="mt-4 inline-block underline" href={`/login?next=${encodeURIComponent(returnTo)}`}>
-          Continue to sign in
-        </Link>
-      </main>
-    );
+    return <SignInRequiredScreen formUrl={formUrl} />;
   }
   if (formQuery.error?.data?.code === "FORBIDDEN") {
     return (
-      <main className="mx-auto max-w-2xl p-8">
-        <h1 className="text-xl font-semibold">Anonymous responses only</h1>
-        <p className="mt-2 text-muted-foreground">Sign out of your account to respond to this form.</p>
-        <Button
-          className="mt-4"
-          onClick={async () => {
-            try {
-              await authClient.signOut();
-              await formQuery.refetch();
-            } catch (error) {
-              toast.error(getTrpcErrorMessage(error, "Unable to sign out."));
-            }
-          }}
-        >
-          Sign out
-        </Button>
-      </main>
+      <AnonymousOnlyScreen
+        onSignOut={async () => {
+          try {
+            await authClient.signOut();
+            await formQuery.refetch();
+          } catch (error) {
+            toast.error(getTrpcErrorMessage(error, "Unable to sign out."));
+          }
+        }}
+      />
     );
   }
-  if (formQuery.isError || !form) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">Form not found</h1></main>;
+  if (formQuery.isError || !form) return <FormNotFoundScreen />;
   if (!form.acceptingResponses && !form.isOwner) {
-    return (
-      <main className="mx-auto max-w-2xl p-8">
-        <h1 className="text-xl font-semibold">
-          {!form.isPublished || !form.isOpen ? "This form is closed" : "This form has reached its response limit"}
-        </h1>
-      </main>
-    );
+    return <FormClosedScreen isLimit={form.isPublished && form.isOpen} />;
   }
-  if (snapshotQuery.isPending) return <main className="mx-auto max-w-2xl p-8 text-sm text-muted-foreground">Loading form...</main>;
-  if (snapshotQuery.isError || !snapshot) return <main className="mx-auto max-w-2xl p-8"><h1 className="text-xl font-semibold">This form is unavailable</h1></main>;
+  if (snapshotQuery.isPending) return <LoadingScreen />;
+  if (snapshotQuery.isError || !snapshot) return <SnapshotUnavailableScreen />;
   if (submitted) {
-    return (
-      <main className="mx-auto max-w-2xl p-8">
-        <h1 className="text-xl font-semibold">
-          {alreadySubmitted ? "You already submitted a response" : "Response submitted"}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {alreadySubmitted ? "This form does not allow another response from your recognized identity." : "Thank you for your response."}
-        </p>
-      </main>
-    );
+    return <SubmissionCompleteScreen alreadySubmitted={alreadySubmitted} />;
   }
 
+  const currentField = currentStep > 0 ? fields[currentStep - 1] : undefined;
+
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      {form.isOwner ? (
-        <p className="mb-4 border border-border bg-muted px-4 py-3 text-sm">
-          Preview mode — responses cannot be submitted.
-        </p>
-      ) : null}
-      <header className="border-b pb-6">
-        <h1 className="text-3xl font-semibold">{form.title}</h1>
-        {form.description ? <p className="mt-3 text-muted-foreground">{form.description}</p> : null}
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {form.isOwner ? <OwnerPreviewBanner /> : null}
+
+      {/* Top Bar with Form Title and Progress Line */}
+      <header className="sticky top-0 z-10 border-b border-border/80 bg-background/95 backdrop-blur-sm px-6 py-4 sm:px-8">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-xs font-medium text-muted-foreground">{form.title}</h2>
+          </div>
+          {currentStep > 0 ? (
+            <div className="w-48 sm:w-60">
+              <ProgressLine
+                current={currentStep}
+                total={fields.length}
+                isSavingDraft={isSavingDraft}
+              />
+            </div>
+          ) : null}
+        </div>
       </header>
-      <form className="mt-8 space-y-6" onSubmit={(event) => void handleSubmit(event)}>
-        {fields.map((field) => {
-          const value = answers[field.id];
-          const options = getOptions(field.config);
-          if (field.type === "textarea") {
-            return <label className="block space-y-2" key={field.id}><span className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</span><Textarea required={field.required} value={typeof value === "string" ? value : ""} onChange={(event) => updateAnswer(field.id, event.target.value)} /></label>;
-          }
-          if (field.type === "checkbox") {
-            return <label className="flex items-center gap-2 text-sm" key={field.id}><input type="checkbox" checked={value === true} onChange={(event) => updateAnswer(field.id, event.target.checked)} required={field.required} />{field.label}</label>;
-          }
-          if (field.type === "select" || field.type === "multiselect") {
-            return <fieldset className="space-y-2" key={field.id}><legend className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</legend>{options.map((option) => <label className="flex items-center gap-2 text-sm" key={option}><input type={field.type === "select" ? "radio" : "checkbox"} name={field.id} value={option} checked={field.type === "select" ? value === option : Array.isArray(value) && value.includes(option)} onChange={(event) => updateAnswer(field.id, field.type === "select" ? option : event.target.checked ? [...(Array.isArray(value) ? value : []), option] : (Array.isArray(value) ? value : []).filter((item) => item !== option))} required={field.required && field.type === "select"} />{option}</label>)}</fieldset>;
-          }
-          if (field.type === "rating") {
-            const config = field.config && typeof field.config === "object" && !Array.isArray(field.config)
-              ? field.config as { maxStars?: unknown }
-              : {};
-            const maxStars = typeof config.maxStars === "number" ? config.maxStars : 5;
-            return (
-              <fieldset className="space-y-2" key={field.id}>
-                <legend className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</legend>
-                <StarRating
-                  label={field.label}
-                  maxStars={maxStars}
-                  value={typeof value === "number" ? value : undefined}
-                  onChange={(rating) => updateAnswer(field.id, rating)}
-                />
-              </fieldset>
-            );
-          }
-          const inputType = field.type === "email" || field.type === "number" || field.type === "date" ? field.type : "text";
-          return <label className="block space-y-2" key={field.id}><span className="text-sm font-medium">{field.label}{field.required ? " *" : ""}</span><Input type={inputType} required={field.required} value={value == null ? "" : String(value)} onChange={(event) => updateAnswer(field.id, inputType === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value)} /></label>;
-        })}
-        {interactionError || startError || submitError || versionQuery.error || versionQuery.data?.mismatch ? (
-          <p className="text-sm text-destructive" role="alert">
-            {interactionError || (versionQuery.data?.mismatch ? "This form has changed. Reload it before submitting." : "Unable to submit this response.")}
-          </p>
-        ) : null}
-        {versionQuery.data?.mismatch ? (
-          <Button type="button" variant="outline" onClick={restartAfterVersionChange}>
-            Start a new response
-          </Button>
-        ) : null}
-        <Button type="submit" disabled={form.isOwner || !submissionId || isSubmitting || isSavingDraft || versionQuery.data?.mismatch}>
-          {form.isOwner ? "Preview only" : isSubmitting || isSavingDraft ? "Submitting..." : "Submit response"}
-        </Button>
-      </form>
-    </main>
+
+      {/* Main Content Area */}
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-12 sm:px-8">
+        <form onSubmit={(e) => void handleSubmit(e)} className="w-full">
+          {currentStep === 0 ? (
+            <IntroScreen
+              title={form.title}
+              description={form.description}
+              totalQuestions={fields.length}
+              onStart={handleNextOrSubmit}
+            />
+          ) : currentField ? (
+            <QuestionScreen
+              key={currentStep}
+              field={currentField}
+              index={currentStep}
+              total={fields.length}
+              value={answers[currentField.id]}
+              error={fieldErrors[currentField.id]}
+              direction={stepDirection}
+              disabled={form.isOwner}
+              onChange={(value) => {
+                updateAnswer(currentField.id, value);
+                if (fieldErrors[currentField.id]) {
+                  setFieldErrors((prev) => ({ ...prev, [currentField.id]: null }));
+                }
+              }}
+            />
+          ) : null}
+
+          {interactionError || startError || submitError || versionQuery.error || versionQuery.data?.mismatch ? (
+            <div className="mt-4 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-xs font-medium text-destructive" role="alert">
+                {interactionError ||
+                  (versionQuery.data?.mismatch
+                    ? "This form has changed. Reload it before submitting."
+                    : "Unable to submit this response.")}
+              </p>
+              {versionQuery.data?.mismatch ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 text-xs"
+                  onClick={() => setRestartDialogOpen(true)}
+                >
+                  Start a new response
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <NavigationControls
+            currentStep={currentStep}
+            totalSteps={fields.length}
+            isOwner={form.isOwner}
+            isSubmitting={isSubmitting}
+            isSavingDraft={isSavingDraft}
+            isVersionMismatch={Boolean(versionQuery.data?.mismatch)}
+            onBack={handlePrevStep}
+            onNext={handleNextOrSubmit}
+            isTextarea={currentField?.type === "textarea"}
+          />
+        </form>
+      </main>
+
+      <RestartVersionDialog
+        open={restartDialogOpen}
+        onOpenChange={setRestartDialogOpen}
+        onConfirm={restartAfterVersionChange}
+      />
+    </div>
   );
 }
