@@ -224,6 +224,11 @@ export default function PublicFormPage() {
     setSubmissionId(undefined);
     setAnswers({});
     setInteractionError("");
+    setCurrentStep(0);
+    setStepDirection("forward");
+    setFieldErrors({});
+    hasRestoredStepRef.current = false;
+    setRestartDialogOpen(false);
   }
 
   // Stepper and validation state
