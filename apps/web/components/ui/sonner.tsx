@@ -22,7 +22,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           <TriangleAlertIcon className="size-4" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <OctagonXIcon className="size-4 text-destructive" />
         ),
         loading: (
           <Loader2Icon className="size-4 animate-spin" />
@@ -38,7 +38,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          toast: "group toast border border-border bg-popover text-popover-foreground shadow-lg rounded-[var(--radius)] font-sans text-xs",
+          description: "text-muted-foreground text-xs",
+          actionButton: "bg-primary text-primary-foreground text-xs rounded-[calc(var(--radius)-2px)] font-medium",
+          cancelButton: "bg-muted text-muted-foreground text-xs rounded-[calc(var(--radius)-2px)] font-medium",
         },
       }}
       {...props}

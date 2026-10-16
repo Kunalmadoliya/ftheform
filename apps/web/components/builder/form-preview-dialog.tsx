@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Eye } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -24,6 +24,7 @@ type FormPreviewDialogProps = {
   description: string;
   fields: BuilderField[];
 };
+
 type FieldConfig = Record<string, unknown>;
 
 function getConfig(field: BuilderField): FieldConfig {
@@ -38,45 +39,54 @@ function PreviewField({ field }: { field: BuilderField }) {
   const inputId = `preview-${field.id}`;
   const placeholder =
     typeof config.placeholder === "string" ? config.placeholder : "Type your answer...";
-  if (field.type === "textarea")
+
+  if (field.type === "textarea") {
     return (
       <Textarea
         id={inputId}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
+        className="text-xs resize-none min-h-20"
       />
     );
-  if (field.type === "checkbox")
+  }
+
+  if (field.type === "checkbox") {
     return (
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 text-xs cursor-pointer">
         <input
           type="checkbox"
           checked={value === "true"}
           onChange={(event) => setValue(String(event.target.checked))}
+          className="accent-foreground"
         />
-        Yes, I agree
+        <span>Yes, I agree</span>
       </label>
     );
+  }
+
   if (field.type === "select" || field.type === "multiselect") {
     const options = Array.isArray(config.options)
       ? config.options.filter((option): option is string => typeof option === "string")
       : [];
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {options.map((option) => (
-          <label key={option} className="flex items-center gap-2 text-sm">
+          <label key={option} className="flex items-center gap-2 text-xs cursor-pointer">
             <input
               type={field.type === "select" ? "radio" : "checkbox"}
               name={inputId}
               value={option}
+              className="accent-foreground"
             />
-            {option}
+            <span>{option}</span>
           </label>
         ))}
       </div>
     );
   }
+
   if (field.type === "rating") {
     const maxStars = typeof config.maxStars === "number" ? config.maxStars : 5;
     return (
@@ -88,10 +98,12 @@ function PreviewField({ field }: { field: BuilderField }) {
       />
     );
   }
+
   const inputType =
     field.type === "email" || field.type === "number" || field.type === "date"
       ? field.type
       : "text";
+
   return (
     <Input
       id={inputId}
@@ -113,6 +125,7 @@ function PreviewField({ field }: { field: BuilderField }) {
       value={value}
       onChange={(event) => setValue(event.target.value)}
       placeholder={placeholder}
+      className="text-xs"
     />
   );
 }
@@ -126,23 +139,32 @@ export function FormPreviewDialog({
 }: FormPreviewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b bg-muted/30 px-6 py-5">
-          <DialogTitle>{title || "Untitled form"}</DialogTitle>
-          <DialogDescription>
-            {description || "Preview how your form will appear to respondents."}
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl p-0">
+        <DialogHeader className="border-b border-border bg-muted/30 p-5">
+          <div className="flex items-center gap-2">
+            <span className="flex size-6 items-center justify-center rounded-[var(--radius)] border border-border bg-background text-foreground">
+              <Eye className="size-3.5" />
+            </span>
+            <DialogTitle className="text-base font-semibold">{title || "Untitled form"}</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs text-muted-foreground mt-1">
+            {description || "Preview how respondents will see and interact with this form."}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5 px-6 py-6">
+
+        <div className="space-y-4 p-5">
           {fields.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              Add a field to see it in the preview.
+            <div className="rounded-[var(--radius)] border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+              No fields added yet. Add fields on the canvas to preview them here.
             </div>
           ) : (
             fields.map((field, index) => (
-              <div key={field.id} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
-                <Label htmlFor={`preview-${field.id}`}>
-                  <span className="mr-2 text-xs text-muted-foreground">
+              <div
+                key={field.id}
+                className="space-y-2 rounded-[var(--radius)] border border-border bg-card p-4"
+              >
+                <Label htmlFor={`preview-${field.id}`} className="text-xs font-medium">
+                  <span className="mr-1.5 font-mono text-[10px] text-muted-foreground">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   {field.label}
@@ -152,10 +174,16 @@ export function FormPreviewDialog({
               </div>
             ))
           )}
+
           {fields.length > 0 ? (
-            <Button type="button" className="w-full" variant="secondary" disabled>
-              <Check />
-              Preview only
+            <Button
+              type="button"
+              className="w-full text-xs"
+              variant="secondary"
+              disabled
+            >
+              <Check className="size-3.5 mr-1" />
+              Preview mode — submissions disabled
             </Button>
           ) : null}
         </div>

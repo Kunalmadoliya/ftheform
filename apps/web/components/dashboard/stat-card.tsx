@@ -8,14 +8,16 @@ type StatCardProps = {
 
 export function StatCard({ label, value, detail }: StatCardProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <Card className="rounded-[var(--radius)] border border-border/80 bg-card p-4 shadow-none">
+      <CardHeader className="p-0 pb-2">
+        <CardTitle className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {label}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-semibold tracking-tight">{value}</p>
+      <CardContent className="p-0">
+        <p className="font-mono text-2xl font-semibold tracking-tight text-foreground">
+          {value}
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>

@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Globe2 } from "lucide-react";
+import { Check, Copy, Globe2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 
- type ShareFormDialogProps = {
+type ShareFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   formUrl?: string | null;
@@ -15,7 +23,13 @@ import { Input } from "~/components/ui/input";
   isPublishing: boolean;
 };
 
-export function ShareFormDialog({ open, onOpenChange, formUrl, isPublished, isPublishing }: ShareFormDialogProps) {
+export function ShareFormDialog({
+  open,
+  onOpenChange,
+  formUrl,
+  isPublished,
+  isPublishing,
+}: ShareFormDialogProps) {
   const [shareUrl, setShareUrl] = useState(formUrl ?? "");
   const [copied, setCopied] = useState(false);
 
@@ -30,10 +44,72 @@ export function ShareFormDialog({ open, onOpenChange, formUrl, isPublished, isPu
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    toast.success("Link copied to clipboard");
+    window.setTimeout(() => setCopied(false), 2000);
   }
 
   const displayedUrl = shareUrl || formUrl || "";
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Share your form</DialogTitle><DialogDescription>{isPublished ? "Your form is live. Copy the link below to share it." : "Creating your public link..."}</DialogDescription></DialogHeader><div className="space-y-3">{isPublishing ? <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground"><Globe2 className="size-4 animate-pulse" />Publishing your form...</div> : displayedUrl ? <div className="flex gap-2"><Input value={displayedUrl} readOnly aria-label="Public form link" /><Button type="button" variant="outline" size="icon" onClick={() => void copyShareUrl()} aria-label="Copy public form link">{copied ? <Check /> : <Copy />}</Button></div> : <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">No public link is available.</p>}</div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Done</Button></DialogFooter></DialogContent></Dialog>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <span className="flex size-7 items-center justify-center rounded-[var(--radius)] border border-border bg-muted">
+              <Globe2 className="size-3.5 text-foreground" />
+            </span>
+            <DialogTitle>Share your form</DialogTitle>
+          </div>
+          <DialogDescription>
+            {isPublished
+              ? "Your form is published and ready to receive submissions."
+              : "Generating public share link..."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {isPublishing ? (
+            <div className="flex items-center gap-2.5 rounded-[var(--radius)] border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground">
+              <Loader2 className="size-4 animate-spin text-foreground shrink-0" />
+              <span>Publishing form to live URL...</span>
+            </div>
+          ) : displayedUrl ? (
+            <div className="flex gap-2">
+              <Input
+                value={displayedUrl}
+                readOnly
+                aria-label="Public form URL"
+                className="font-mono text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => void copyShareUrl()}
+                aria-label="Copy public form link"
+                className="shrink-0 size-9"
+              >
+                {copied ? <Check className="size-4 text-foreground" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-[var(--radius)] border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+              No public link is available yet.
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

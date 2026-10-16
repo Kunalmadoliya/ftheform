@@ -1,10 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { BuilderPage } from "~/components/builder/builder-page";
-import { useParams } from "next/navigation";
-
-export default function BuilderRoute() {
-  const params = useParams<{ formId: string }>();
-
-  return <BuilderPage formId={params.formId} />;
+export default async function BuilderLegacyRedirect({
+  params,
+}: {
+  params: Promise<{ formId: string }>;
+}) {
+  const { formId } = await params;
+  redirect(`/forms/${formId}/builder`);
 }

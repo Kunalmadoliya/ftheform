@@ -14,7 +14,6 @@ import {
 
 import { FieldTypeItem, type FieldTypeDefinition } from "~/components/builder/field-type-item";
 
-// No field registry exists in the current backend, so these use the generic field contract it accepts.
 export const fieldTypes: FieldTypeDefinition[] = [
   { type: "text", label: "Short text", description: "One-line answer", icon: Type },
   { type: "textarea", label: "Long text", description: "Multi-line answer", icon: Text },
@@ -32,19 +31,23 @@ export const fieldTypes: FieldTypeDefinition[] = [
   { type: "date", label: "Date", description: "Date picker", icon: CalendarDays },
 ];
 
-type FieldTypePaletteProps = { onAdd: (definition: FieldTypeDefinition) => void };
+type FieldTypePaletteProps = {
+  onAdd: (definition: FieldTypeDefinition) => void;
+};
 
 export function FieldTypePalette({ onAdd }: FieldTypePaletteProps) {
   return (
-    <aside className="border-r bg-background p-4 lg:w-64">
-      <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Field types
-      </h2>
-      <div className="grid gap-2">
+    <div className="flex-1 overflow-y-auto p-3">
+      <div className="mb-2.5 px-1">
+        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Field types
+        </h2>
+      </div>
+      <div className="grid gap-1.5">
         {fieldTypes.map((definition) => (
           <FieldTypeItem key={definition.type} definition={definition} onAdd={onAdd} />
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

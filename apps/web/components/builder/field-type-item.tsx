@@ -1,7 +1,6 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-
 import { Button } from "~/components/ui/button";
 
 export type FieldTypeDefinition = {
@@ -19,9 +18,20 @@ type FieldTypeItemProps = {
 export function FieldTypeItem({ definition, onAdd }: FieldTypeItemProps) {
   const Icon = definition.icon;
   return (
-    <Button variant="outline" className="h-auto justify-start gap-3 p-3 text-left" onClick={() => onAdd(definition)}>
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"><Icon className="size-4" /></span>
-      <span className="min-w-0"><span className="block text-sm font-medium">{definition.label}</span><span className="block truncate text-xs font-normal text-muted-foreground">{definition.description}</span></span>
+    <Button
+      variant="outline"
+      className="h-auto w-full justify-start gap-2.5 p-2.5 text-left border-border/80 bg-card hover:bg-muted/60 transition-colors"
+      onClick={() => onAdd(definition)}
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-[calc(var(--radius)-2px)] border border-border/60 bg-muted text-foreground">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-medium text-foreground">{definition.label}</span>
+        <span className="block truncate font-mono text-[10px] text-muted-foreground">
+          {definition.description}
+        </span>
+      </span>
     </Button>
   );
 }

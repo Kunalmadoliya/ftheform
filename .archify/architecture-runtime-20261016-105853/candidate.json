@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "FTHEFORM Runtime Architecture",
+    "locale": "en",
+    "output": ".archify/architecture-runtime-20261016-105853/ftheform-runtime.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Kunalmadoliya/ftheform.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9a74a195a0bedcd3d6145293d8382cb5313e93fb"
+    }
+  },
+  "components": [
+    {
+      "id": "respondent",
+      "type": "external",
+      "label": "Respondent",
+      "sublabel": "Public browser session",
+      "pos": [40, 40],
+      "size": [130, 66],
+      "sources": [
+        { "path": "apps/web/app/form/[formUrl]/page.tsx", "line": 46, "end_line": 50, "label": "Public form route" },
+        { "path": "apps/web/app/form/[formUrl]/page.tsx", "line": 172, "end_line": 199, "label": "Response submission" }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Next.js web app",
+      "sublabel": "Public form UI · tRPC client",
+      "pos": [280, 40],
+      "size": [170, 70],
+      "sources": [
+        { "path": "apps/web/app/form/[formUrl]/page.tsx", "line": 46, "end_line": 68, "label": "Form and submission hooks" },
+        { "path": "apps/web/trpc/create-client.ts", "line": 8, "end_line": 16, "label": "API transport" }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Express API",
+      "sublabel": "tRPC · request identity · services",
+      "pos": [280, 250],
+      "size": [180, 74],
+      "sources": [
+        { "path": "apps/api/src/server.ts", "line": 87, "end_line": 103, "label": "tRPC and OpenAPI mounts" },
+        { "path": "packages/trpc/server/context.ts", "line": 69, "end_line": 100, "label": "Session and respondent context" },
+        { "path": "packages/services/form_submission/index.ts", "line": 472, "end_line": 621, "label": "Validated submission transaction" }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Drizzle · forms and responses",
+      "pos": [650, 250],
+      "size": [160, 70],
+      "sources": [
+        { "path": "packages/database/index.ts", "line": 1, "end_line": 6, "label": "Drizzle connection" },
+        { "path": "docker-compose.yml", "line": 1, "end_line": 17, "label": "Local PostgreSQL service" },
+        { "path": "README.md", "line": 90, "end_line": 117, "label": "Production deployment" }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "API trust boundary", "wraps": ["api"], "pad": 18 },
+    { "kind": "region", "label": "Persistence boundary", "wraps": ["postgres"], "pad": 18 }
+  ],
+  "connections": [
+    { "id": "open-form", "from": "respondent", "to": "web", "label": "open form", "variant": "emphasis" },
+    { "id": "tRPC-submit", "from": "web", "to": "api", "label": "tRPC submit", "variant": "emphasis" },
+    { "id": "persist-response", "from": "api", "to": "postgres", "label": "save answers", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Submission behavior",
+      "items": [
+        "The public form loads its published snapshot; respondents start a response and autosave drafts.",
+        "On submit, the API checks publication, access, snapshot version, required answers, identity and response limits, then commits answer rows and submitted status in one transaction."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust boundaries",
+      "items": [
+        "Browser input crosses into the server-side API, which derives a Better Auth session or validates a signed respondent cookie.",
+        "The API and PostgreSQL are separate runtime/data boundaries; DB access is configured through DATABASE_URL."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Other external dependencies",
+      "items": [
+        "Better Auth uses Google and GitHub OAuth; email verification calls Resend.",
+        "Inngest runs optional background form-generation jobs; those jobs call OpenAI when configured.",
+        "Deployment docs name Vercel for web, Render for API and Neon for production PostgreSQL; Compose provides local PostgreSQL."
+      ]
+    }
+  ]
+}

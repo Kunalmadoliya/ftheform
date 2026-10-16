@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, LayoutTemplate, MessageSquare, Sparkles } from "lucide-react";
+import { BarChart3, FileText, LayoutTemplate, MessageSquare } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { trpc } from "~/trpc/client";
@@ -38,7 +38,9 @@ export function SidebarNav() {
   useEffect(() => {
     const stored = window.localStorage.getItem("responses-last-visited");
     const storedTimestamp = stored ? Number(stored) : null;
-    setLastVisited(storedTimestamp !== null && !Number.isFinite(storedTimestamp) ? null : storedTimestamp);
+    setLastVisited(
+      storedTimestamp !== null && !Number.isFinite(storedTimestamp) ? null : storedTimestamp,
+    );
     if (pathname === "/responses") {
       const now = Date.now();
       window.localStorage.setItem("responses-last-visited", String(now));
@@ -47,14 +49,17 @@ export function SidebarNav() {
   }, [pathname]);
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
-      <div className="flex h-16 items-center gap-2 border-b px-6 text-sm font-semibold">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Sparkles className="size-4" />
+    <aside className="hidden w-60 shrink-0 border-r border-border bg-sidebar md:flex md:flex-col">
+      <div className="flex h-14 items-center gap-2.5 border-b border-border px-5 text-sm font-semibold tracking-tight text-sidebar-foreground">
+        <span className="flex size-6 items-center justify-center rounded-[var(--radius)] bg-foreground font-mono text-[11px] font-bold text-background">
+          F
         </span>
-        FTHEFORM
+        <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
+          FTHEFORM
+        </span>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
+
+      <nav className="flex-1 space-y-1 p-3">
         {items.map((item) => {
           const Icon = item.icon;
           const active =
@@ -65,15 +70,19 @@ export function SidebarNav() {
               key={item.label}
               asChild
               variant={active ? "secondary" : "ghost"}
-              className="w-full justify-start gap-3"
+              className={`w-full justify-start gap-2.5 h-9 px-3 text-xs font-normal transition-colors ${
+                active
+                  ? "bg-secondary text-foreground font-medium shadow-none"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              }`}
             >
               <Link href={item.href} aria-current={active ? "page" : undefined}>
-                <Icon className="size-4" />
-                {item.label}
+                <Icon className="size-4 shrink-0" />
+                <span>{item.label}</span>
                 {item.label === "Responses" && hasNewResponses ? (
                   <span
-                    className="ml-auto size-2 rounded-full bg-primary"
-                    aria-label="New responses"
+                    className="ml-auto size-1.5 rounded-full bg-foreground"
+                    aria-label="New responses indicator"
                   />
                 ) : null}
               </Link>
@@ -81,8 +90,11 @@ export function SidebarNav() {
           );
         })}
       </nav>
-      <div className="border-t p-4 text-xs text-muted-foreground">
-        Build clear forms. Collect useful answers.
+
+      <div className="border-t border-border p-4">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          © FTHEFORM
+        </p>
       </div>
     </aside>
   );
