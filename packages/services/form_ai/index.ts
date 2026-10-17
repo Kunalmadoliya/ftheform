@@ -22,6 +22,11 @@ import {
   type StartFormGenerationInput,
 } from "./model";
 import { FORM_GENERATION_SYSTEM_PROMPT } from "./prompts/systemPrompts";
+import {
+  NonFormRequestError,
+  sanitizeGeneratedForm,
+  validatePromptInput,
+} from "./guardrails";
 
 const formFields = new FormFieldService();
 const dailyGenerationQuota = 10;
@@ -34,6 +39,8 @@ export default class FormAiService {
       throw serviceError("INTERNAL_SERVER_ERROR", "AI form generation is not configured.");
     }
     const { formId, prompt } = await startFormGenerationInput.parseAsync(input);
+    const validatedPrompt = validatePromptInput(prompt, userId);
+
     const now = new Date();
     const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const job = await db.transaction(async (tx) => {
@@ -88,7 +95,7 @@ export default class FormAiService {
 
       const [createdJob] = await tx
         .insert(formGenerationJob)
-        .values({ formId, userId, prompt, status: "pending" })
+        .values({ formId, userId, prompt: validatedPrompt, status: "pending" })
         .returning({
           id: formGenerationJob.id,
           formId: formGenerationJob.formId,
@@ -184,18 +191,38 @@ export default class FormAiService {
     if (!response.output_parsed) {
       throw new GeneratedFieldsValidationError("The AI returned no structured form fields");
     }
-    return normalizeOpenAiGeneratedForm(response.output_parsed);
+    const normalized = normalizeOpenAiGeneratedForm(response.output_parsed);
+    if (
+      !normalized.fields ||
+      normalized.fields.length === 0 ||
+      normalized.title === "Invalid Form Request"
+    ) {
+      throw new NonFormRequestError("I can only help create forms. Please describe the form you want.");
+    }
+    return sanitizeGeneratedForm(normalized);
   }
 
   public async completeGeneration(
     jobId: string,
     result: GeneratedFormResult | GeneratedFields,
   ) {
-    const rawFields = Array.isArray(result) ? result : result.fields;
-    const title = !Array.isArray(result) ? result.title : undefined;
-    const description = !Array.isArray(result) ? result.description : undefined;
+    const rawResult: GeneratedFormResult = Array.isArray(result)
+      ? { fields: result }
+      : result;
 
-    const validatedFields = generatedFieldsSchema.parse(rawFields);
+    if (
+      !rawResult.fields ||
+      rawResult.fields.length === 0 ||
+      rawResult.title === "Invalid Form Request"
+    ) {
+      throw new NonFormRequestError("I can only help create forms. Please describe the form you want.");
+    }
+
+    const sanitized = sanitizeGeneratedForm(rawResult);
+    const validatedFields = generatedFieldsSchema.parse(sanitized.fields);
+    const title = sanitized.title;
+    const description = sanitized.description;
+
     return db.transaction(async (tx) => {
       const [jobReference] = await tx
         .select({ formId: formGenerationJob.formId })
@@ -240,16 +267,14 @@ export default class FormAiService {
         validatedFields,
       );
 
+      const isDefaultTitle = generationForm.title === "Untitled Form";
+      const isDescriptionEmpty = !generationForm.description || !generationForm.description.trim();
+
       const formUpdates: { title?: string; description?: string } = {};
-      if (
-        title &&
-        (generationForm.title === "Untitled Form" ||
-          generationForm.title.startsWith("Generating") ||
-          !generationForm.title.trim())
-      ) {
+      if (title && isDefaultTitle) {
         formUpdates.title = title;
       }
-      if (description && !generationForm.description?.trim()) {
+      if (description && isDescriptionEmpty) {
         formUpdates.description = description;
       }
       if (Object.keys(formUpdates).length > 0) {

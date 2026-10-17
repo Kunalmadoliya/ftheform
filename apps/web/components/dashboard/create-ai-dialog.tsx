@@ -55,11 +55,11 @@ export function CreateAiDialog({
       }
     },
     onFailed: (err) => {
-      if (createdFormId) {
-        toast.error(err || "AI generation failed. You can retry from the builder dock.");
-        onOpenChange(false);
-        router.push(`/forms/${createdFormId}/builder`);
-      }
+      const msg = err || "I can only help create forms. Please describe the form you want.";
+      setSubmitError(msg);
+      toast.error(msg);
+      setIsCreating(false);
+      isSubmittingRef.current = false;
     },
     onTimedOut: () => {
       if (createdFormId) {
@@ -83,9 +83,9 @@ export function CreateAiDialog({
   }, [initialPrompt, open]);
 
   const trimmedLength = prompt.trim().length;
-  const isValidLength = trimmedLength >= 8 && trimmedLength <= 2000;
-  // Busy from moment creation starts until terminal outcome
-  const isBusy = isCreating || Boolean(createdFormId) || isGenerating;
+  const isValidLength = trimmedLength >= 8 && trimmedLength <= 1000;
+  // Busy while initial form is creating or AI is generating
+  const isBusy = isCreating || isGenerating;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,29 +96,25 @@ export function CreateAiDialog({
     setIsCreating(true);
 
     const cleanPrompt = prompt.trim();
-    let targetFormId: string | null = null;
+    let targetFormId = createdFormId;
     try {
-      const newForm = await createFormAsync({ title: "Untitled Form" });
-      targetFormId = newForm.id;
-      setCreatedFormId(newForm.id);
+      if (!targetFormId) {
+        const newForm = await createFormAsync({ title: "Untitled Form" });
+        targetFormId = newForm.id;
+        setCreatedFormId(newForm.id);
+      }
       setIsCreating(false);
 
       await startGeneration({
-        formId: newForm.id,
+        formId: targetFormId,
         prompt: cleanPrompt,
       });
     } catch (error) {
       setIsCreating(false);
+      isSubmittingRef.current = false;
       const message = getTrpcErrorMessage(error, "Unable to create or generate form.");
       setSubmitError(message);
-      // If the form was already created but generation start failed, still navigate so user isn't stuck
-      if (targetFormId) {
-        toast.error(message);
-        onOpenChange(false);
-        router.push(`/forms/${targetFormId}/builder`);
-      } else {
-        isSubmittingRef.current = false;
-      }
+      toast.error(message);
     }
   }
 
@@ -160,14 +156,14 @@ export function CreateAiDialog({
               </Label>
               <span
                 className={`font-mono text-[10px] ${
-                  trimmedLength > 2000
+                  trimmedLength > 1000
                     ? "text-destructive"
                     : trimmedLength < 8 && trimmedLength > 0
                       ? "text-muted-foreground"
                       : "text-muted-foreground"
                 }`}
               >
-                {trimmedLength} / 2000
+                {trimmedLength} / 1000
               </span>
             </div>
             <Textarea
@@ -181,14 +177,28 @@ export function CreateAiDialog({
               required
             />
             <p className="text-[11px] text-muted-foreground">
-              Minimum 8 characters. You can refine and add more questions in the builder.
+              Between 8 and 1000 characters. You can refine and add more questions in the builder.
             </p>
           </div>
 
           {submitError || statusError ? (
-            <p className="text-xs text-destructive" role="alert">
-              {submitError || statusError}
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-destructive" role="alert">
+                {submitError || statusError}
+              </p>
+              {createdFormId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenChange(false);
+                    router.push(`/forms/${createdFormId}/builder`);
+                  }}
+                  className="text-[11px] text-muted-foreground underline hover:text-foreground"
+                >
+                  Continue to blank form in builder &rarr;
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {isBusy ? (

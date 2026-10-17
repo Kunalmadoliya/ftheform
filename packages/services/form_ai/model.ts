@@ -106,7 +106,7 @@ export const openAiGeneratedFieldsSchema = z.strictObject({
         config: structuredFieldConfigSchema,
       }),
     )
-    .min(1)
+    .min(0)
     .max(20),
 });
 
@@ -147,6 +147,14 @@ export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormRe
     throw new GeneratedFieldsValidationError(
       `The AI returned malformed structured form fields: ${issues}`,
     );
+  }
+
+  if (parsedResponse.data.fields.length === 0) {
+    return {
+      title: parsedResponse.data.title,
+      description: parsedResponse.data.description,
+      fields: [],
+    };
   }
 
   const fields = parsedResponse.data.fields.map((field) => {
@@ -200,7 +208,7 @@ export function normalizeOpenAiGeneratedFields(response: unknown): GeneratedFiel
 
 export const startFormGenerationInput = z.strictObject({
   formId: z.string().uuid(),
-  prompt: z.string().trim().min(8).max(2000),
+  prompt: z.string().trim().min(8).max(1000),
 });
 
 export const getFormGenerationStatusInput = z.strictObject({

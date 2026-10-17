@@ -4,6 +4,7 @@ import { formAiServiceInstance, safeGenerationError } from "./index";
 import { isOpenAiConfigurationError } from "./client";
 import { env } from "../env";
 import { GeneratedFieldsValidationError, type GeneratedFormResult } from "./model";
+import { NonFormRequestError } from "./guardrails";
 
 export const generateFormFieldsFunction = inngest.createFunction(
   {
@@ -35,18 +36,27 @@ export const generateFormFieldsFunction = inngest.createFunction(
       result = await step.run("generate-fields", () =>
         formAiServiceInstance.generateFields(job.prompt),
       );
+      await step.run("persist-generated-fields", () =>
+        formAiServiceInstance.completeGeneration(job.id, result),
+      );
     } catch (error) {
+      if (error instanceof NonFormRequestError) {
+        await formAiServiceInstance.markFailed(job.id, error.message);
+        throw new NonRetriableError(error.message);
+      }
       if (isOpenAiConfigurationError(error)) {
+        await formAiServiceInstance.markFailed(
+          job.id,
+          "OpenAI rejected the configured API credentials or model.",
+        );
         throw new NonRetriableError("OpenAI rejected the configured API credentials or model.");
       }
       if (error instanceof GeneratedFieldsValidationError) {
+        await formAiServiceInstance.markFailed(job.id, error.message);
         throw new NonRetriableError(error.message);
       }
       throw error;
     }
-    await step.run("persist-generated-fields", () =>
-      formAiServiceInstance.completeGeneration(job.id, result),
-    );
     return { status: "completed" };
   },
 );
