@@ -76,13 +76,7 @@ export async function createContext({
   });
   const userId = authSession?.user.id ?? null;
   const respondentId = readRespondentId(req.headers.cookie);
-  const clientIp =
-    req.ip ||
-    (typeof req.headers["x-forwarded-for"] === "string"
-      ? req.headers["x-forwarded-for"].split(",")[0]?.trim()
-      : null) ||
-    req.socket?.remoteAddress ||
-    "127.0.0.1";
+  const clientIp = req.ip || req.socket?.remoteAddress || "127.0.0.1";
 
   function setRespondentCookie(id: string) {
     if (!respondentIdPattern.test(id)) {

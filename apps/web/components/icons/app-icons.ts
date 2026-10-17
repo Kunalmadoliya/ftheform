@@ -65,6 +65,7 @@ export const IconResponses = MessageSquare;
 export const IconAnalytics = BarChart3;
 export const IconUser = User;
 export const IconEmail = Mail;
+export const IconMail = Mail;
 export const IconPassword = LockKeyhole;
 export const IconSpinner = Loader2;
 export const IconMore = MoreHorizontal;

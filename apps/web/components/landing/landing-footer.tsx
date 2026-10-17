@@ -33,6 +33,12 @@ export function LandingFooter() {
           >
             Pricing
           </a>
+          <Link
+            href="/contact"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Contact
+          </Link>
         </nav>
       </div>
     </footer>

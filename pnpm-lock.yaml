@@ -646,9 +646,6 @@ importers:
       inngest:
         specifier: ^4.23.0
         version: 4.23.0(@opentelemetry/core@2.12.0(@opentelemetry/api@1.9.1))(express@5.2.1(supports-color@7.2.0))(h3@1.15.11)(hono@4.13.8)(next@16.3.5(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(supports-color@7.2.0)(typescript@5.9.3)(zod@4.6.5)
-      nodemailer:
-        specifier: ^10.1.1
-        version: 10.1.1
       openai:
         specifier: ^7.32.0
         version: 7.32.0(undici@7.29.1)(zod@4.6.5)
@@ -668,9 +665,6 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@types/nodemailer':
-        specifier: ^8.0.2
-        version: 8.0.2
       dotenv-cli:
         specifier: ^11.0.0
         version: 11.0.0
@@ -3936,9 +3930,6 @@ packages:
   '@types/node@22.20.3':
     resolution: {integrity: sha512-DZmzkmwHzXrLPAXPyKNDzlIwMMUZCVacoD25ywdy5YTKGbOx/2ld+Q38Im2zJ0vBuZP5Prd3VZutKZyXwkOS8A==}
 
-  '@types/nodemailer@8.0.2':
-    resolution: {integrity: sha512-c7M5ox8p0nEOfbJ2E9Qcmt8/QCu/VzsiAhzBiZbvky2PhKZDHpKB3sQHBM5MEZNkCfBOaS6S9//AGPRTNB7IaA==}
-
   '@types/pg-pool@2.0.7':
     resolution: {integrity: sha512-U4CwmGVQcbEuqpyju8/ptOKg6gEC+Tqsvj2xS9o1g71bUh8twxnC6ZL5rZKCsGN0iyH0CwgUyc9VR5owNQF9Ng==}
 
@@ -6133,10 +6124,6 @@ packages:
   node-releases@2.0.55:
     resolution: {integrity: sha512-mIrE/Cw9y+9Au6dS5vDKDhQza9YvG6w+ZrS6X+ZzA7yFW/soAeaups4Qzn1bL6g5FVy8WtP79+0j82oPIbqRjQ==}
     engines: {node: '>=18'}
-
-  nodemailer@10.1.1:
-    resolution: {integrity: sha512-pbqZRoeYUO+1E8TJ/11WeY4D2EVujj1hsYjz3qff/vUFDtGnmi7p3iqzTFslYOfQ6PnjVcWxx/CIUSHCSrO/QA==}
-    engines: {node: '>=20.0.0'}
 
   npm-run-path@4.0.1:
     resolution: {integrity: sha512-S48WzZW777zhNIrn7gxOlISNAqi9ZC/uQFnRdbeIHhZhCA6UqpkOT8T1G7BvfdgP4Er8gF4sUbaS0i7QvIfCWw==}
@@ -10281,10 +10268,6 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/nodemailer@8.0.2':
-    dependencies:
-      '@types/node': 22.20.3
-
   '@types/pg-pool@2.0.7':
     dependencies:
       '@types/pg': 8.23.1
@@ -12554,8 +12537,6 @@ snapshots:
   node-mock-http@1.0.5: {}
 
   node-releases@2.0.55: {}
-
-  nodemailer@10.1.1: {}
 
   npm-run-path@4.0.1:
     dependencies:

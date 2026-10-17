@@ -135,6 +135,7 @@ app.get("/health", (req, res) => {
   return res.json({ message: "FTHEFORM API is healthy.", healthy: true });
 });
 
+
 app.get("/api/me", async (req, res) => {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),

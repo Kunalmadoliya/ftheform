@@ -17,6 +17,7 @@ import {
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { useAiGeneration } from "~/components/builder/use-ai-generation";
+import { useRazorpayCheckout } from "~/hooks/payment/use-razorpay-checkout";
 import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
 type CreateAiDialogProps = {
@@ -38,6 +39,15 @@ export function CreateAiDialog({
   const [createdFormId, setCreatedFormId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
   const isSubmittingRef = useRef(false);
+
+  const {
+    credits,
+    dailyFreeRemaining,
+    isLoadingCredits,
+    buyCredits,
+    isBuying: isBuyingCredits,
+    buyingLabel,
+  } = useRazorpayCheckout();
 
   const {
     startGeneration,
@@ -182,10 +192,55 @@ export function CreateAiDialog({
           </div>
 
           {submitError || statusError ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-xs text-destructive" role="alert">
                 {submitError || statusError}
               </p>
+
+              {(() => {
+                const activeError = (submitError || statusError || "").toLowerCase();
+                const isLimit =
+                  activeError.includes("limit") ||
+                  activeError.includes("credit") ||
+                  activeError.includes("quota");
+                if (!isLimit) return null;
+
+                return (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2.5">
+                  <div className="flex items-start gap-2">
+                    <IconAi className="size-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-foreground">
+                        Generation Quota Exhausted
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        You have used your free daily quota. Purchase 20 credits to continue generating forms with AI.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={buyCredits}
+                    disabled={isBuyingCredits}
+                    className="w-full text-xs h-8 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-none"
+                  >
+                    {isBuyingCredits ? (
+                      <>
+                        <IconSpinner className="size-3.5 animate-spin" />
+                        <span>{buyingLabel}</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconAi className="size-3.5" />
+                        <span>Buy Credits (Rs. 400 for 20 generations)</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              );
+            })()}
+
               {createdFormId ? (
                 <button
                   type="button"
@@ -214,31 +269,44 @@ export function CreateAiDialog({
             </div>
           ) : null}
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isBusy}
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!isValidLength || isBusy}
-            >
-              {isBusy ? (
-                <>
-                  <IconSpinner className="size-3.5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <IconAi className="size-3.5" />
-                  Generate form
-                </>
-              )}
-            </Button>
+          <DialogFooter className="flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground self-start sm:self-center">
+              <IconAi className="size-3.5 text-amber-500 shrink-0" />
+              <span>
+                {isLoadingCredits
+                  ? "Loading credits..."
+                  : `${credits} credits available${
+                      dailyFreeRemaining > 0 ? ` (${dailyFreeRemaining} free today)` : ""
+                    }`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isBusy}
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!isValidLength || isBusy}
+              >
+                {isBusy ? (
+                  <>
+                    <IconSpinner className="size-3.5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <IconAi className="size-3.5" />
+                    Generate form
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

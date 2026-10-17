@@ -8,11 +8,8 @@ const envSchema = z.object({
   RAZORPAY_KEY_SECRET: z.string().trim().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().trim().optional(),
   CONTACT_EMAIL: z.string().email().optional(),
-  SMTP_HOST: z.string().trim().optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional().default(465),
-  SMTP_USER: z.string().trim().optional(),
-  SMTP_PASS: z.string().trim().optional(),
-  SMTP_FROM: z.string().trim().optional(),
+  CONTACT_RESEND_API_KEY: z.string().trim().optional(),
+  CONTACT_FROM_EMAIL: z.string().trim().optional().default("onboarding@resend.dev"),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

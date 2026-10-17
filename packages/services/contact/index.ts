@@ -48,7 +48,7 @@ export default class ContactService {
     clientIp: string,
     options?: {
       sendMailFn?: (opts: SendContactMailOptions) => Promise<void>;
-      transporterOverride?: SendContactMailOptions["transporterOverride"];
+      fetchFn?: typeof fetch;
     },
   ): Promise<SendMessageOutput> {
     // 1. Honeypot check: If filled, silently return success without sending
@@ -70,7 +70,7 @@ export default class ContactService {
         name: input.name,
         email: input.email,
         message: input.message,
-        transporterOverride: options?.transporterOverride,
+        fetchFn: options?.fetchFn,
       });
     } catch (err: unknown) {
       logger.error("Failed to deliver contact form message", { error: err });

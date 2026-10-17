@@ -9,6 +9,7 @@ import {
   IconAnalytics,
   IconDashboard,
   IconForms,
+  IconMail,
   IconTemplates,
   IconResponses,
 } from "~/components/icons/app-icons";
@@ -102,8 +103,18 @@ export function SidebarNav() {
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
-        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="border-t border-border p-3 space-y-2">
+        <Button
+          asChild
+          variant="ghost"
+          className="w-full justify-start gap-2.5 h-8 px-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        >
+          <Link href="/contact">
+            <IconMail className="size-3.5 shrink-0" />
+            <span>Contact Support</span>
+          </Link>
+        </Button>
+        <p className="px-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           © FTHEFORM
         </p>
       </div>

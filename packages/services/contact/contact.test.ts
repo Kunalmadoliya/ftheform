@@ -6,7 +6,7 @@ import ContactService, {
 import { escapeHtml, sanitizeHeader, sendContactMail } from "./mailer";
 import { sendMessageInput } from "./model";
 
-describe("Contact Form 5D Unit & Integration Tests", () => {
+describe("Contact Form 5D Unit & Integration Tests (Resend HTTPS API)", () => {
   beforeEach(() => {
     _resetContactRateLimits();
     vi.restoreAllMocks();
@@ -99,7 +99,7 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain("Thank you for reaching out");
-      // Transporter was never invoked
+      // Fetch / mailer was never invoked
       expect(sendMailMock).not.toHaveBeenCalled();
     });
   });
@@ -132,17 +132,17 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
     });
   });
 
-  describe("Message Delivery & Mailer Integration", () => {
-    it("sends valid message and sets correct recipient, replyTo, subject, and escaped content", async () => {
+  describe("Message Delivery & Resend HTTPS API Integration", () => {
+    it("sends valid message via Resend HTTPS API with correct headers, reply_to, subject, and escaped content", async () => {
       const contactService = new ContactService();
-      let sentMailOptions: any = null;
+      let fetchUrl = "";
+      let fetchOptions: any = null;
 
-      const mockTransporter: any = {
-        sendMail: vi.fn().mockImplementation((opts) => {
-          sentMailOptions = opts;
-          return Promise.resolve({ messageId: "test-id" });
-        }),
-      };
+      const mockFetch: typeof fetch = vi.fn().mockImplementation((url, opts) => {
+        fetchUrl = String(url);
+        fetchOptions = opts;
+        return Promise.resolve(new Response(JSON.stringify({ id: "resend_msg_123" }), { status: 200 }));
+      });
 
       const result = await contactService.sendMessage(
         {
@@ -156,27 +156,34 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
             sendContactMail({
               ...opts,
               contactEmail: "admin@ftheform.com",
-              transporterOverride: mockTransporter,
+              apiKey: "re_test_key_12345",
+              fromEmail: "onboarding@resend.dev",
+              fetchFn: mockFetch,
             }),
         },
       );
 
       expect(result.success).toBe(true);
-      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(1);
-      expect(sentMailOptions.to).toBe("admin@ftheform.com");
-      expect(sentMailOptions.replyTo).toBe("alice@example.com");
-      expect(sentMailOptions.subject).toBe("New Contact Form Message from Alice Smith");
-      expect(sentMailOptions.subject).not.toContain("\r");
-      expect(sentMailOptions.html).toContain("&lt;script&gt;alert(&#039;test&#039;)&lt;/script&gt;");
-      expect(sentMailOptions.text).toContain("Hello!\nI need help with a custom form.");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(fetchUrl).toBe("https://api.resend.com/emails");
+      expect(fetchOptions.headers["Authorization"]).toBe("Bearer re_test_key_12345");
+
+      const body = JSON.parse(fetchOptions.body);
+      expect(body.to).toEqual(["admin@ftheform.com"]);
+      expect(body.reply_to).toBe("alice@example.com");
+      expect(body.from).toBe("onboarding@resend.dev");
+      expect(body.subject).toBe("New Contact Form Message from Alice Smith");
+      expect(body.subject).not.toContain("\r");
+      expect(body.html).toContain("&lt;script&gt;alert(&#039;test&#039;)&lt;/script&gt;");
+      expect(body.text).toContain("Hello!\nI need help with a custom form.");
     });
 
-    it("returns a generic error message when the mailer fails and does not leak provider details", async () => {
+    it("returns a generic error message when Resend returns non-200 and does not leak API details", async () => {
       const contactService = new ContactService();
 
-      const mockFailingTransporter: any = {
-        sendMail: vi.fn().mockRejectedValue(new Error("535 5.7.8 Username and Password not accepted / SMTP authentication failed")),
-      };
+      const mockFailingFetch: typeof fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify({ message: "Invalid API key or quota exceeded" }), { status: 403 })),
+      );
 
       await expect(
         contactService.sendMessage(
@@ -191,7 +198,8 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
               sendContactMail({
                 ...opts,
                 contactEmail: "admin@ftheform.com",
-                transporterOverride: mockFailingTransporter,
+                apiKey: "re_bad_key",
+                fetchFn: mockFailingFetch,
               }),
           },
         ),
@@ -201,9 +209,11 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
     it("fails gracefully with generic error when mailer env vars are missing", async () => {
       const contactService = new ContactService();
 
-      // Ensure no CONTACT_EMAIL configured
+      // Ensure no CONTACT_EMAIL / CONTACT_RESEND_API_KEY configured
       const originalContactEmail = process.env.CONTACT_EMAIL;
+      const originalApiKey = process.env.CONTACT_RESEND_API_KEY;
       delete process.env.CONTACT_EMAIL;
+      delete process.env.CONTACT_RESEND_API_KEY;
 
       await expect(
         contactService.sendMessage(
@@ -216,9 +226,8 @@ describe("Contact Form 5D Unit & Integration Tests", () => {
         ),
       ).rejects.toThrow("Could not send your message, please try again");
 
-      if (originalContactEmail) {
-        process.env.CONTACT_EMAIL = originalContactEmail;
-      }
+      if (originalContactEmail) process.env.CONTACT_EMAIL = originalContactEmail;
+      if (originalApiKey) process.env.CONTACT_RESEND_API_KEY = originalApiKey;
     });
   });
 });

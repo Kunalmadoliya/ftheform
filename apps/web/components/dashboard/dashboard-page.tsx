@@ -32,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ThemeToggle } from "~/components/theme-toggle";
 import { useForm, useFormLifecycle, type FormLifecycleFilter } from "~/hooks/form/use-form";
 import { useSubmissionsAcrossForms } from "~/hooks/form/use-submissions-across-forms";
+import { useRazorpayCheckout } from "~/hooks/payment/use-razorpay-checkout";
 import { authClient } from "~/lib/auth-client";
 import { getTrpcErrorMessage } from "~/lib/trpc-error-message";
 
@@ -58,6 +59,14 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
   const [lifecycle, setLifecycle] = useState<FormLifecycleFilter>("live");
   const lifecycleData = useFormLifecycle(lifecycle);
   const submissionData = useSubmissionsAcrossForms(forms.map(({ id, title }) => ({ id, title })));
+  const {
+    credits,
+    dailyFreeRemaining,
+    isLoadingCredits,
+    buyCredits,
+    isBuying,
+    buyingLabel,
+  } = useRazorpayCheckout();
 
   // Dialog state
   const [dialog, setDialog] = useState<"edit" | "delete" | null>(null);
@@ -326,6 +335,38 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-1.5 rounded-[var(--radius)] border border-border/80 bg-muted/40 px-3 py-1.5 text-xs">
+                <span className="text-muted-foreground">Credits:</span>
+                <span className="font-semibold text-foreground">
+                  {isLoadingCredits ? "..." : credits}
+                </span>
+                {dailyFreeRemaining > 0 ? (
+                  <span className="text-[11px] text-muted-foreground/80">
+                    ({dailyFreeRemaining} free today)
+                  </span>
+                ) : null}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={buyCredits}
+                disabled={isBuying}
+                className="h-9 gap-1.5 text-xs font-medium border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/5 text-foreground"
+              >
+                {isBuying ? (
+                  <>
+                    <IconSpinner className="size-3.5 animate-spin" />
+                    <span>{buyingLabel}</span>
+                  </>
+                ) : (
+                  <>
+                    <IconAi className="size-3.5 text-amber-500" />
+                    <span>Rs. 400 for 20 generations</span>
+                  </>
+                )}
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"

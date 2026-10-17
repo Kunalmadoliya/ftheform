@@ -1,23 +1,14 @@
-import nodemailer, { type Transporter } from "nodemailer";
 import { logger } from "@repo/logger";
 import { env } from "../env";
-
-export interface MailerConfig {
-  host?: string;
-  port?: number;
-  user?: string;
-  pass?: string;
-  from?: string;
-  secure?: boolean;
-}
 
 export interface SendContactMailOptions {
   name: string;
   email: string;
   message: string;
   contactEmail?: string;
-  mailerConfig?: MailerConfig;
-  transporterOverride?: Transporter;
+  apiKey?: string;
+  fromEmail?: string;
+  fetchFn?: typeof fetch;
 }
 
 /**
@@ -40,34 +31,30 @@ export function sanitizeHeader(str: string): string {
 }
 
 /**
- * Isolated Contact Mailer using Nodemailer SMTP.
- * Never touches existing Better Auth Resend email paths.
+ * Isolated Contact Mailer using Resend HTTPS API.
+ * Uses CONTACT_RESEND_API_KEY and CONTACT_FROM_EMAIL.
+ * Never touches or reuses Better Auth's internal email code.
  */
 export async function sendContactMail(options: SendContactMailOptions): Promise<void> {
   const contactEmail =
     options.contactEmail || process.env.CONTACT_EMAIL || env.CONTACT_EMAIL;
-  const host =
-    options.mailerConfig?.host || process.env.SMTP_HOST || env.SMTP_HOST;
-  const user =
-    options.mailerConfig?.user || process.env.SMTP_USER || env.SMTP_USER;
-  const pass =
-    options.mailerConfig?.pass || process.env.SMTP_PASS || env.SMTP_PASS;
-  const from =
-    options.mailerConfig?.from || process.env.SMTP_FROM || env.SMTP_FROM || user;
-  const port =
-    options.mailerConfig?.port ||
-    Number(process.env.SMTP_PORT) ||
-    env.SMTP_PORT ||
-    465;
-  const secure = options.mailerConfig?.secure ?? (port === 465);
+  const apiKey =
+    options.apiKey ||
+    process.env.CONTACT_RESEND_API_KEY ||
+    env.CONTACT_RESEND_API_KEY;
+  const fromEmail =
+    options.fromEmail ||
+    process.env.CONTACT_FROM_EMAIL ||
+    env.CONTACT_FROM_EMAIL ||
+    "onboarding@resend.dev";
 
   if (!contactEmail) {
     logger.error("Contact mailer error: CONTACT_EMAIL is not configured.");
     throw new Error("Contact mailer not configured");
   }
 
-  if (!options.transporterOverride && (!host || !user || !pass)) {
-    logger.error("Contact mailer error: SMTP credentials are not configured.");
+  if (!apiKey) {
+    logger.error("Contact mailer error: CONTACT_RESEND_API_KEY is not configured.");
     throw new Error("Contact mailer not configured");
   }
 
@@ -93,30 +80,34 @@ export async function sendContactMail(options: SendContactMailOptions): Promise<
     </div>
   `.trim();
 
-  const transporter =
-    options.transporterOverride ||
-    nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: {
-        user,
-        pass,
-      },
-    });
+  const fetchImplementation = options.fetchFn || globalThis.fetch;
 
   try {
-    await transporter.sendMail({
-      to: contactEmail,
-      from: from || user,
-      replyTo: options.email,
-      subject,
-      text: textBody,
-      html: htmlBody,
+    const response = await fetchImplementation("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [contactEmail],
+        reply_to: options.email,
+        subject,
+        text: textBody,
+        html: htmlBody,
+      }),
     });
-    logger.info(`Contact message successfully forwarded to ${contactEmail}`);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      logger.error(`Resend API returned HTTP ${response.status}`, { details: errorText });
+      throw new Error(`Resend rejected delivery with status ${response.status}`);
+    }
+
+    logger.info(`Contact message successfully delivered to ${contactEmail} via Resend HTTP API`);
   } catch (err: unknown) {
-    logger.error("Failed to deliver contact email via SMTP", { error: err });
+    logger.error("Failed to deliver contact email via Resend HTTP API", { error: err });
     throw err;
   }
 }
