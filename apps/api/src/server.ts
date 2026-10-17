@@ -69,7 +69,8 @@ app.use(
   cors({
     origin: env.trustedOrigins,
     credentials: true,
-  }),
+  })
+);
 // ---------------------------------------------------------------------------
 // Better Auth route MUST be mounted before express.json(),
 // since toNodeHandler needs the raw, unparsed request stream.

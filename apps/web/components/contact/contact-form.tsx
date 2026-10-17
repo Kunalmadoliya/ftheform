@@ -58,9 +58,15 @@ export function ContactForm({ onSuccess, className = "" }: ContactFormProps) {
       setHoneypot("");
       onSuccess?.();
     } catch (err: unknown) {
-      // Always show generic error message as requested
-      const msg = getTrpcErrorMessage(err, "Could not send your message, please try again");
-      setErrorMessage(msg || "Could not send your message, please try again");
+      const errorMsg = getTrpcErrorMessage(err, "");
+      if (
+        errorMsg.toLowerCase().includes("too many") ||
+        errorMsg.toLowerCase().includes("rate limit")
+      ) {
+        setErrorMessage(errorMsg);
+      } else {
+        setErrorMessage("Could not send your message, please try again");
+      }
     }
   }
 

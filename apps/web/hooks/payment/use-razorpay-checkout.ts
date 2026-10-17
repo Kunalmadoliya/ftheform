@@ -9,6 +9,16 @@ function loadRazorpayScript(): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if ((window as any).Razorpay) return Promise.resolve(true);
 
+  const existingScript = document.querySelector(
+    'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+  );
+  if (existingScript) {
+    return new Promise((resolve) => {
+      existingScript.addEventListener("load", () => resolve(true));
+      existingScript.addEventListener("error", () => resolve(false));
+    });
+  }
+
   return new Promise((resolve) => {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
