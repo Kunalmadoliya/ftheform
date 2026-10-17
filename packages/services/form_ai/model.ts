@@ -84,8 +84,8 @@ const structuredFieldConfigSchema = z.strictObject({
 });
 
 export const openAiGeneratedFieldsSchema = z.strictObject({
-  title: z.string().trim().min(1).max(120).optional(),
-  description: z.string().trim().max(500).optional(),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500),
   fields: z
     .array(
       z.strictObject({
@@ -139,7 +139,28 @@ export interface GeneratedFormResult {
 }
 
 export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormResult {
-  const parsedResponse = openAiGeneratedFieldsSchema.safeParse(response);
+  const rawTitle =
+    typeof response === "object" && response !== null && "title" in response
+      ? (response as { title?: unknown }).title
+      : undefined;
+  const rawDescription =
+    typeof response === "object" && response !== null && "description" in response
+      ? (response as { description?: unknown }).description
+      : undefined;
+
+  const hasTitle = rawTitle !== null && rawTitle !== undefined;
+  const hasDescription = rawDescription !== null && rawDescription !== undefined;
+
+  const preparedResponse =
+    typeof response === "object" && response !== null
+      ? {
+          ...response,
+          title: hasTitle ? rawTitle : "Untitled Form",
+          description: hasDescription ? rawDescription : "",
+        }
+      : response;
+
+  const parsedResponse = openAiGeneratedFieldsSchema.safeParse(preparedResponse);
   if (!parsedResponse.success) {
     const issues = parsedResponse.error.issues
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
@@ -151,8 +172,8 @@ export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormRe
 
   if (parsedResponse.data.fields.length === 0) {
     return {
-      title: parsedResponse.data.title,
-      description: parsedResponse.data.description,
+      ...(hasTitle ? { title: parsedResponse.data.title } : {}),
+      ...(hasDescription ? { description: parsedResponse.data.description } : {}),
       fields: [],
     };
   }
@@ -162,7 +183,9 @@ export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormRe
     const unsupportedKeys = Object.entries(field.config)
       .filter(
         ([key, value]) =>
-          value !== null && !allowedKeys.some((allowedKey) => allowedKey === key),
+          value !== null &&
+          value !== undefined &&
+          !allowedKeys.some((allowedKey) => allowedKey === key),
       )
       .map(([key]) => key);
     if (unsupportedKeys.length > 0) {
@@ -174,7 +197,7 @@ export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormRe
     const config = Object.fromEntries(
       allowedKeys.flatMap((key) => {
         const value = field.config[key];
-        return value === null ? [] : [[key, value]];
+        return value === null || value === undefined ? [] : [[key, value]];
       }),
     );
     return {
@@ -196,8 +219,8 @@ export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormRe
     );
   }
   return {
-    title: parsedResponse.data.title,
-    description: parsedResponse.data.description,
+    ...(hasTitle ? { title: parsedResponse.data.title } : {}),
+    ...(hasDescription ? { description: parsedResponse.data.description } : {}),
     fields: validatedFields.data,
   };
 }

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { zodTextFormat } from "openai/helpers/zod";
 import {
   GeneratedFieldsValidationError,
   generatedFieldsSchema,
   normalizeOpenAiGeneratedFields,
+  normalizeOpenAiGeneratedForm,
+  openAiGeneratedFieldsSchema,
 } from "./model";
 import { createFormField } from "../form_feild/model";
 
@@ -146,5 +149,32 @@ describe("normalizeOpenAiGeneratedFields", () => {
         fields: [field("number", "Age", { min: 99, max: 18 })],
       }),
     ).toThrow("Minimum cannot exceed maximum");
+  });
+
+  it("handles title and description properly, treating null the same as undefined", () => {
+    const withTitleAndDesc = normalizeOpenAiGeneratedForm({
+      title: "Feedback Form",
+      description: "Please share your thoughts.",
+      fields: [field("text", "Feedback", { placeholder: "Your feedback" })],
+    });
+    expect(withTitleAndDesc.title).toBe("Feedback Form");
+    expect(withTitleAndDesc.description).toBe("Please share your thoughts.");
+
+    const withNullTitleAndDesc = normalizeOpenAiGeneratedForm({
+      title: null,
+      description: null,
+      fields: [field("text", "Feedback", { placeholder: null })],
+    });
+    expect(withNullTitleAndDesc.title).toBeUndefined();
+    expect(withNullTitleAndDesc.description).toBeUndefined();
+    expect(withNullTitleAndDesc.fields[0]?.config).toBeUndefined();
+  });
+});
+
+describe("openAiGeneratedFieldsSchema with zodTextFormat", () => {
+  it("converts to OpenAI structured outputs format without throwing", () => {
+    expect(() =>
+      zodTextFormat(openAiGeneratedFieldsSchema, "generated_form_fields"),
+    ).not.toThrow();
   });
 });
