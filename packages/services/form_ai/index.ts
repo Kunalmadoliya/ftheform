@@ -1,4 +1,5 @@
 import { and, count, db, eq, gte, inArray, lt, sql } from "@repo/database";
+import { user } from "@repo/database/auth-schema";
 import { form, formField, formGenerationJob } from "@repo/database/models/form-schema";
 import { zodTextFormat } from "openai/helpers/zod";
 import { ZodError } from "zod";
@@ -27,9 +28,14 @@ import {
   sanitizeGeneratedForm,
   validatePromptInput,
 } from "./guardrails";
+import {
+  CREDIT_EXHAUSTED_MESSAGE,
+  DAILY_FREE_GENERATION_QUOTA,
+  evaluateGenerationCreditEligibility,
+} from "./credits";
 
 const formFields = new FormFieldService();
-const dailyGenerationQuota = 10;
+const dailyGenerationQuota = DAILY_FREE_GENERATION_QUOTA;
 const promptRetentionDays = 30;
 export const safeGenerationError = "Form generation failed after multiple attempts. Please try again.";
 
@@ -80,8 +86,39 @@ export default class FormAiService {
           gte(formGenerationJob.createdAt, dayStart),
         ));
       if (!dailyJobs) throw serviceError("INTERNAL_SERVER_ERROR", "Unable to check the daily generation quota");
-      if (dailyJobs.count >= dailyGenerationQuota) {
-        throw serviceError("TOO_MANY_REQUESTS", "The daily form-generation limit has been reached");
+
+      let usedCredit = false;
+      if (dailyJobs.count < dailyGenerationQuota) {
+        usedCredit = false;
+      } else {
+        const [userData] = await tx
+          .select({ credits: user.credits })
+          .from(user)
+          .where(eq(user.id, userId))
+          .for("update");
+        const userCredits = userData?.credits ?? 0;
+
+        const [pendingPaidJobs] = await tx
+          .select({ count: count() })
+          .from(formGenerationJob)
+          .where(and(
+            eq(formGenerationJob.userId, userId),
+            eq(formGenerationJob.usedCredit, true),
+            inArray(formGenerationJob.status, ["pending", "running"]),
+          ));
+        const pendingCount = pendingPaidJobs?.count ?? 0;
+
+        const eligibility = evaluateGenerationCreditEligibility(
+          dailyJobs.count,
+          userCredits,
+          pendingCount,
+          dailyGenerationQuota,
+        );
+
+        if (!eligibility.allowed) {
+          throw serviceError("TOO_MANY_REQUESTS", CREDIT_EXHAUSTED_MESSAGE);
+        }
+        usedCredit = eligibility.usedCredit;
       }
 
       const [existingFields] = await tx
@@ -95,7 +132,7 @@ export default class FormAiService {
 
       const [createdJob] = await tx
         .insert(formGenerationJob)
-        .values({ formId, userId, prompt: validatedPrompt, status: "pending" })
+        .values({ formId, userId, prompt: validatedPrompt, status: "pending", usedCredit })
         .returning({
           id: formGenerationJob.id,
           formId: formGenerationJob.formId,
@@ -279,6 +316,15 @@ export default class FormAiService {
       }
       if (Object.keys(formUpdates).length > 0) {
         await tx.update(form).set(formUpdates).where(eq(form.id, job.formId));
+      }
+
+      if (job.usedCredit) {
+        await tx
+          .update(user)
+          .set({
+            credits: sql`GREATEST(0, ${user.credits} - 1)`,
+          })
+          .where(eq(user.id, job.userId));
       }
 
       const [completedJob] = await tx

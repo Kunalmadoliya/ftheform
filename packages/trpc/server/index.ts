@@ -8,17 +8,18 @@ import { formSnapshotRouter } from "./routes/form_snapshot/index";
 import { submissionRouter } from "./routes/submission/route";
 import { answerRouter } from "./routes/answer/route";
 import { formAiRouter } from "./routes/form-ai/route";
+import { paymentRouter } from "./routes/payment/route";
 
 export const serverRouter = router({
   health: healthRouter,
-  auth : authRouter ,
-  form : formRouter,
+  auth: authRouter,
+  form: formRouter,
   formField: formFieldRouter,
   formSnapshot: formSnapshotRouter,
   submission: submissionRouter,
   answer: answerRouter,
   formAi: formAiRouter,
-
+  payment: paymentRouter,
 });
 
 export { createContext } from "./context";
