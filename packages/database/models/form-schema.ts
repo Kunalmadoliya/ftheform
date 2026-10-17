@@ -123,6 +123,7 @@ export const formGenerationJob = pgTable(
     prompt: text("prompt").notNull(),
     status: formGenerationJobStatus("status").notNull().default("pending"),
     error: text("error"),
+    usedCredit: boolean("used_credit").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => new Date())

@@ -1,0 +1,27 @@
+name: Keep-Alive Ping (Backup)
+
+# NOTE: GitHub Actions cron schedules can be delayed or skipped during high GitHub traffic.
+# Therefore, this workflow is only an optional secondary backup. Use an external monitoring service
+# like cron-job.org or UptimeRobot as your primary pinger to ensure reliable 5-minute pings.
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Health Endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health
+        run: |
+          echo "Pinging https://api.kunalmadolia.me/health..."
+          curl --fail --silent --show-error --location \
+            --max-time 60 \
+            --retry 2 \
+            --retry-delay 5 \
+            https://api.kunalmadolia.me/health || true
+        # Ensure the workflow never fails even if the endpoint is temporarily slow or unreachable
+        continue-on-error: true

@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
-import { pgEnum, pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, boolean, index, integer } from "drizzle-orm/pg-core";
 import { form, submission } from "./models/form-schema";
+import { payment } from "./models/payment-schema";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 
@@ -11,6 +12,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   role: roleEnum("role").default("user").notNull(),
+  credits: integer("credits").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -82,8 +84,9 @@ export const verification = pgTable(
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
-  form : many(form) ,
-  submission : many(submission)
+  form: many(form),
+  submission: many(submission),
+  payment: many(payment),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
