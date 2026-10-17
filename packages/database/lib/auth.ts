@@ -51,7 +51,18 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
       if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-        throw new Error("RESEND_API_KEY and EMAIL_FROM are required to send verification emails");
+        const missing = [
+          !env.RESEND_API_KEY ? "RESEND_API_KEY" : null,
+          !env.EMAIL_FROM ? "EMAIL_FROM" : null,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        console.error(
+          `[auth] Cannot send verification email to ${user.email}: missing environment variable(s): ${missing}`,
+        );
+        throw new Error(
+          `RESEND_API_KEY and EMAIL_FROM are required to send verification emails (missing: ${missing})`,
+        );
       }
       const escapedUrl = url.replace(
         /[&<>"']/g,
@@ -78,7 +89,13 @@ export const auth = betterAuth({
         }),
       });
       if (!response.ok) {
-        throw new Error(`Resend rejected the verification email request (${response.status})`);
+        const errorText = await response.text().catch(() => "");
+        console.error(
+          `[auth] Resend rejected verification email to ${user.email} (status ${response.status}): ${errorText}`,
+        );
+        throw new Error(
+          `Resend rejected the verification email request (${response.status}): ${errorText}`,
+        );
       }
     },
   },
