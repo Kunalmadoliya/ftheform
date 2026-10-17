@@ -20,9 +20,13 @@ const sanitizedErrors = tRPCContext.middleware(async ({ next }) => {
     if (result.error.cause) {
       logger.error("Unhandled API error", { error: result.error.cause });
     }
+    const safeMessage =
+      result.error.message && result.error.message !== "INTERNAL_SERVER_ERROR"
+        ? result.error.message
+        : "An unexpected server error occurred.";
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "An unexpected server error occurred.",
+      message: safeMessage,
     });
   }
   return result;

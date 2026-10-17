@@ -9,6 +9,7 @@ import { submissionRouter } from "./routes/submission/route";
 import { answerRouter } from "./routes/answer/route";
 import { formAiRouter } from "./routes/form-ai/route";
 import { paymentRouter } from "./routes/payment/route";
+import { contactRouter } from "./routes/contact/route";
 
 export const serverRouter = router({
   health: healthRouter,
@@ -20,6 +21,7 @@ export const serverRouter = router({
   answer: answerRouter,
   formAi: formAiRouter,
   payment: paymentRouter,
+  contact: contactRouter,
 });
 
 export { createContext } from "./context";

@@ -21,6 +21,7 @@ import { expireInactiveSubmissionsFunction } from "@repo/services/form_submissio
 import { inngest } from "@repo/services/form_ai/inngest-client";
 import { createPublicProcedureRateLimit } from "./public-rate-limit";
 import { createCsrfMiddleware } from "./csrf";
+import { handleRazorpayWebhook } from "@repo/services/payment";
 
 import { env } from "./env";
 
@@ -69,15 +70,37 @@ app.use(
     origin: env.trustedOrigins,
     credentials: true,
   }),
-);
-
 // ---------------------------------------------------------------------------
 // Better Auth route MUST be mounted before express.json(),
 // since toNodeHandler needs the raw, unparsed request stream.
 // ---------------------------------------------------------------------------
 app.all("/api/auth/{*splat}", toNodeHandler(auth));
 
-// JSON parser for every other route, after the auth handler
+// ---------------------------------------------------------------------------
+// Razorpay Webhook: Mounted with express.raw() BEFORE express.json()
+// and BEFORE CSRF / Rate limiting / OpenAPI /api mount.
+// ---------------------------------------------------------------------------
+app.post(
+  "/api/webhooks/razorpay",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    try {
+      const rawBody = Buffer.isBuffer(req.body)
+        ? req.body
+        : Buffer.from(req.body || "");
+      const result = await handleRazorpayWebhook(
+        rawBody,
+        req.headers["x-razorpay-signature"],
+      );
+      return res.status(result.status).json(result.body);
+    } catch (error) {
+      logger.error("Unhandled error processing Razorpay webhook", { error });
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// JSON parser for every other route, after the auth and raw webhook handlers
 app.use(express.json({ limit: "256kb" }));
 
 // ---------------------------------------------------------------------------

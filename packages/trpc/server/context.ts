@@ -64,6 +64,7 @@ export interface ContextUser {
   userRole: string | null;
   respondentId: string | null;
   setRespondentCookie: (respondentId: string) => void;
+  clientIp: string;
 }
 
 export async function createContext({
@@ -75,6 +76,13 @@ export async function createContext({
   });
   const userId = authSession?.user.id ?? null;
   const respondentId = readRespondentId(req.headers.cookie);
+  const clientIp =
+    req.ip ||
+    (typeof req.headers["x-forwarded-for"] === "string"
+      ? req.headers["x-forwarded-for"].split(",")[0]?.trim()
+      : null) ||
+    req.socket?.remoteAddress ||
+    "127.0.0.1";
 
   function setRespondentCookie(id: string) {
     if (!respondentIdPattern.test(id)) {
@@ -100,6 +108,7 @@ export async function createContext({
     userRole: authSession?.user.role ?? null,
     respondentId,
     setRespondentCookie,
+    clientIp,
   };
 }
 export type Context = ContextUser;

@@ -1,0 +1,3 @@
+export const RAZORPAY_PAYMENT_AMOUNT_PAISE = 40000; // Rs. 400 in paise
+export const RAZORPAY_PAYMENT_CURRENCY = "INR";
+export const RAZORPAY_CREDITS_PER_PURCHASE = 20;

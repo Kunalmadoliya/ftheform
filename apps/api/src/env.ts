@@ -60,9 +60,17 @@ const envSchema = z
     TRUSTED_ORIGINS: trustedOriginsEnv,
     DATABASE_URL: z.url().optional(),
     DEV_DATABASE_URL: z.url().optional(),
-    PROD_DATABASE_URL: z.url().optional(),
     BETTER_AUTH_SECRET: z.string().min(32),
     RESPONDENT_COOKIE_SECRET: z.string().min(32),
+    RAZORPAY_KEY_ID: z.string().trim().optional(),
+    RAZORPAY_KEY_SECRET: z.string().trim().optional(),
+    RAZORPAY_WEBHOOK_SECRET: z.string().trim().optional(),
+    CONTACT_EMAIL: z.string().email().optional(),
+    SMTP_HOST: z.string().trim().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().optional().default(465),
+    SMTP_USER: z.string().trim().optional(),
+    SMTP_PASS: z.string().trim().optional(),
+    SMTP_FROM: z.string().trim().optional(),
   })
   .superRefine((values, context) => {
     if (values.NODE_ENV !== "production") return;

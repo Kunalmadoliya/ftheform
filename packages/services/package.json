@@ -6,6 +6,7 @@
     "@eslint/js": "9.7.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/nodemailer": "^8.0.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "9.7.0",
     "typescript": "^5.9.3",
@@ -20,7 +21,9 @@
     "drizzle-orm": "^0.45.2",
     "google-auth-library": "^11.1.0",
     "inngest": "^4.23.0",
+    "nodemailer": "^10.1.1",
     "openai": "^7.32.0",
+    "razorpay": "^2.9.8",
     "zod": "^4.6.5"
   }
 }

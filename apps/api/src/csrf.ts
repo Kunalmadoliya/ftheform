@@ -25,7 +25,7 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  * - /api/auth/callback — Better Auth OAuth callbacks: these come from the IdP,
  *   not from a browser form, and they carry an authorization_code, not a cookie.
  */
-const EXEMPT_PREFIXES = ["/api/inngest", "/api/auth/callback"];
+const EXEMPT_PREFIXES = ["/api/inngest", "/api/auth/callback", "/api/webhooks/razorpay"];
 
 /**
  * Returns an Express middleware that enforces CSRF origin checks on
