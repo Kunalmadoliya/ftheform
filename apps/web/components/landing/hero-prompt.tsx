@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { IconAi } from "~/components/icons/app-icons";
+import { IconAi, IconSpinner } from "~/components/icons/app-icons";
 import { authClient } from "~/lib/auth-client";
 
 const EXAMPLE_PROMPTS = [
@@ -89,8 +89,17 @@ export function HeroPrompt() {
               disabled={!isValid || isSessionPending || isSubmitting}
               className="h-10 gap-2 font-mono text-xs"
             >
-              <IconAi className="size-4" />
-              {isSubmitting ? "Redirecting..." : "Generate form"}
+              {isSubmitting ? (
+                <>
+                  <IconSpinner className="size-4 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                <>
+                  <IconAi className="size-4" />
+                  Generate form
+                </>
+              )}
             </Button>
           </div>
         </form>

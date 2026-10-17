@@ -96,14 +96,9 @@ export function CreateAiDialog({
     setIsCreating(true);
 
     const cleanPrompt = prompt.trim();
-    const sensibleTitle =
-      cleanPrompt.length > 40
-        ? `${cleanPrompt.slice(0, 40).trim()}...`
-        : cleanPrompt || "AI generated form";
-
     let targetFormId: string | null = null;
     try {
-      const newForm = await createFormAsync({ title: sensibleTitle });
+      const newForm = await createFormAsync({ title: "Untitled Form" });
       targetFormId = newForm.id;
       setCreatedFormId(newForm.id);
       setIsCreating(false);

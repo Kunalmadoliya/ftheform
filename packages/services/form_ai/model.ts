@@ -84,6 +84,8 @@ const structuredFieldConfigSchema = z.strictObject({
 });
 
 export const openAiGeneratedFieldsSchema = z.strictObject({
+  title: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(500).optional(),
   fields: z
     .array(
       z.strictObject({
@@ -130,7 +132,13 @@ export class GeneratedFieldsValidationError extends Error {
   }
 }
 
-export function normalizeOpenAiGeneratedFields(response: unknown): GeneratedFields {
+export interface GeneratedFormResult {
+  title?: string;
+  description?: string;
+  fields: GeneratedFields;
+}
+
+export function normalizeOpenAiGeneratedForm(response: unknown): GeneratedFormResult {
   const parsedResponse = openAiGeneratedFieldsSchema.safeParse(response);
   if (!parsedResponse.success) {
     const issues = parsedResponse.error.issues
@@ -179,7 +187,15 @@ export function normalizeOpenAiGeneratedFields(response: unknown): GeneratedFiel
       `The AI returned invalid field configuration: ${issues}`,
     );
   }
-  return validatedFields.data;
+  return {
+    title: parsedResponse.data.title,
+    description: parsedResponse.data.description,
+    fields: validatedFields.data,
+  };
+}
+
+export function normalizeOpenAiGeneratedFields(response: unknown): GeneratedFields {
+  return normalizeOpenAiGeneratedForm(response).fields;
 }
 
 export const startFormGenerationInput = z.strictObject({

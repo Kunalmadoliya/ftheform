@@ -3,7 +3,7 @@ import { inngest } from "./inngest-client";
 import { formAiServiceInstance, safeGenerationError } from "./index";
 import { isOpenAiConfigurationError } from "./client";
 import { env } from "../env";
-import { GeneratedFieldsValidationError, type GeneratedFields } from "./model";
+import { GeneratedFieldsValidationError, type GeneratedFormResult } from "./model";
 
 export const generateFormFieldsFunction = inngest.createFunction(
   {
@@ -30,9 +30,9 @@ export const generateFormFieldsFunction = inngest.createFunction(
     await step.run("mark-generation-running", () =>
       formAiServiceInstance.markRunning(job.id),
     );
-    let fields: GeneratedFields;
+    let result: GeneratedFormResult;
     try {
-      fields = await step.run("generate-fields", () =>
+      result = await step.run("generate-fields", () =>
         formAiServiceInstance.generateFields(job.prompt),
       );
     } catch (error) {
@@ -45,7 +45,7 @@ export const generateFormFieldsFunction = inngest.createFunction(
       throw error;
     }
     await step.run("persist-generated-fields", () =>
-      formAiServiceInstance.completeGeneration(job.id, fields),
+      formAiServiceInstance.completeGeneration(job.id, result),
     );
     return { status: "completed" };
   },

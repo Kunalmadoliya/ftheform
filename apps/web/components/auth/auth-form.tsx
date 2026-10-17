@@ -237,7 +237,13 @@ export function AuthForm({ mode }: AuthFormProps) {
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
               <Button type="submit" className="h-10 w-full gap-2 font-medium" disabled={isPending}>
                 {isPending && <IconSpinner className="size-4 animate-spin" />}
-                {isSignUp ? "Create account" : "Sign in"}
+                {isPending
+                  ? isSignUp
+                    ? "Creating account..."
+                    : "Signing in..."
+                  : isSignUp
+                    ? "Create account"
+                    : "Sign in"}
               </Button>
             </form>
 

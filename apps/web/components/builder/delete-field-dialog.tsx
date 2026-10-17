@@ -1,5 +1,6 @@
 "use client";
 
+import { IconSpinner } from "~/components/icons/app-icons";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -54,7 +55,14 @@ export function DeleteFieldDialog({
               onOpenChange(false);
             }}
           >
-            {isDeleting ? "Deleting..." : "Delete field"}
+            {isDeleting ? (
+              <>
+                <IconSpinner className="size-3.5 animate-spin mr-1.5" />
+                Deleting...
+              </>
+            ) : (
+              "Delete field"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

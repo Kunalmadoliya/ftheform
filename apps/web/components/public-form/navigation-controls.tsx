@@ -67,9 +67,21 @@ export function NavigationControls({
               "Submit response"
             )
           ) : isIntro ? (
+            isBusy ? (
+              <>
+                <IconSpinner className="size-3.5 animate-spin mr-1.5" />
+                Starting...
+              </>
+            ) : (
+              <>
+                Start
+                <IconChevronRight className="size-3.5 ml-1" />
+              </>
+            )
+          ) : isBusy ? (
             <>
-              Start
-              <IconChevronRight className="size-3.5 ml-1" />
+              <IconSpinner className="size-3.5 animate-spin mr-1.5" />
+              Saving...
             </>
           ) : (
             <>

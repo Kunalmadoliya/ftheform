@@ -521,7 +521,14 @@ export function DashboardPage({ showAllForms = false }: { showAllForms?: boolean
                 Cancel
               </Button>
               <Button type="submit" size="sm" disabled={isPending}>
-                {isPending ? "Saving..." : "Save details"}
+                {isPending ? (
+                  <>
+                    <IconSpinner className="size-3.5 animate-spin mr-1.5" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save details"
+                )}
               </Button>
             </DialogFooter>
           </form>
